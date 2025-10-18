@@ -1,13 +1,24 @@
 package main
 
 import (
+	"context"
+	"log"
 	"net/http"
+	"openai/db"
 	handlers "openai/handlers"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	conn, err := db.Connect()
+	if err != nil {
+		log.Fatalf("DB conenction error: %v", err)
+	}
+	defer conn.Close(context.Background())
+
+	log.Println("Succesfully connected to the DB")
+
 	router := gin.Default()
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
