@@ -1,0 +1,2 @@
+curl https://api.openai.com/v1/models \
+  -H "Authorization: Bearer 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"

@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-
+	
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
 
 func openaiApi() {
 	apiKeys := []string{
-		"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",
+		"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",
 	}
 
 	for i := 0; i < len(apiKeys); i++ { // Исправлено: i < len(apiKeys)
