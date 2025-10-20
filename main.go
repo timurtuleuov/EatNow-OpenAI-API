@@ -40,10 +40,27 @@ func main() {
 	})
 	router.POST("/recipe", func(c *gin.Context) {
 		var body struct {
+			UserID string `json:"user"`
 			Prompt string `json:"prompt"`
 		}
 		if err := c.ShouldBindJSON(&body); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+			return
+		}
+
+		// Проверка, что user_id и prompt не пустые
+		if body.UserID == "" || body.Prompt == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing user_id or prompt"})
+			return
+		}
+
+		allowed, err := handlers.CanUsePrompt(conn, body.UserID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+			return
+		}
+		if !allowed {
+			c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
 			return
 		}
 

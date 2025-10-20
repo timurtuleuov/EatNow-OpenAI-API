@@ -1,19 +1,20 @@
 package handlers
 
 import (
-	"database/sql"
+	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 const FreeDailyLimit = 5
 
-func CanUsePrompt(db *sql.DB, userID string) (bool, error) {
-
+func CanUsePrompt(db *pgx.Conn, userID string) (bool, error) {
 	var isPremium bool
-	var premiumExpires, lastPromptDate sql.NullTime
+	var premiumExpires, lastPromptDate *time.Time
 	var used int
 
-	err := db.QueryRow(`
+	err := db.QueryRow(context.Background(), `
 		SELECT is_premium, premium_expires, daily_used_prompts, last_prompt_date
 		FROM users WHERE id = $1
 	`, userID).Scan(&isPremium, &premiumExpires, &used, &lastPromptDate)
@@ -23,24 +24,28 @@ func CanUsePrompt(db *sql.DB, userID string) (bool, error) {
 
 	now := time.Now()
 
-	// Проверяем истёк ли премиум
-	if isPremium && premiumExpires.Valid && premiumExpires.Time.After(now) {
-		return true, nil // премиум — без ограничений
+	// Премиум — без лимита
+	if isPremium && premiumExpires != nil && premiumExpires.After(now) {
+		return true, nil
 	}
 
-	// Если новая дата — сбрасываем счётчик
-	if !lastPromptDate.Valid || lastPromptDate.Time.Format("2006-01-02") != now.Format("2006-01-02") {
-		_, err = db.Exec(`UPDATE users SET daily_used_prompts = 1, last_prompt_date = $2 WHERE id = $1`, userID, now)
+	// Новая дата → сброс счётчика
+	if lastPromptDate == nil || lastPromptDate.Format("2006-01-02") != now.Format("2006-01-02") {
+		_, err = db.Exec(context.Background(), `
+			UPDATE users SET daily_used_prompts = 1, last_prompt_date = $2 WHERE id = $1
+		`, userID, now)
 		return true, err
 	}
 
-	// Проверяем лимит
+	// Проверка лимита
 	if used >= FreeDailyLimit {
 		return false, nil
 	}
 
 	// Увеличиваем счётчик
-	_, err = db.Exec(`UPDATE users SET daily_used_prompts = daily_used_prompts + 1 WHERE id = $1`, userID)
+	_, err = db.Exec(context.Background(), `
+		UPDATE users SET daily_used_prompts = daily_used_prompts + 1 WHERE id = $1
+	`, userID)
 	if err != nil {
 		return false, err
 	}
