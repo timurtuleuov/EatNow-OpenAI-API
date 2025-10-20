@@ -4,12 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const FreeDailyLimit = 5
 
-func CanUsePrompt(db *pgx.Conn, userID string) (bool, error) {
+func CanUsePrompt(db *pgxpool.Pool, userID string) (bool, error) {
 	var isPremium bool
 	var premiumExpires, lastPromptDate *time.Time
 	var used int

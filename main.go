@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"openai/db"
@@ -17,11 +16,11 @@ func main() {
 		log.Printf("Не удалось загрузить .env: %v", err)
 	}
 
-	conn, err := db.Connect()
+	pool, err := db.Connect()
 	if err != nil {
-		log.Fatalf("DB conenction error: %v", err)
+		log.Fatalf("DB connection error: %v", err)
 	}
-	defer conn.Close(context.Background())
+	defer pool.Close()
 
 	log.Println("Succesfully connected to the DB")
 
@@ -54,7 +53,7 @@ func main() {
 			return
 		}
 
-		allowed, err := handlers.CanUsePrompt(conn, body.UserID)
+		allowed, err := handlers.CanUsePrompt(pool, body.UserID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 			return

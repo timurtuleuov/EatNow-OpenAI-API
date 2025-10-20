@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func Connect() (*pgx.Conn, error) {
-	conn, err := pgx.Connect(context.Background(), "postgres://core:12345678@localhost:5432/govault")
+func Connect() (*pgxpool.Pool, error) {
+	connStr := "postgres://core:12345678@localhost:5432/govault"
+	pool, err := pgxpool.New(context.Background(), connStr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "undable to connect to database", err)
+		fmt.Fprintf(os.Stderr, "unable to connect to database: %v\n", err)
 		return nil, err
 	}
 
-	fmt.Println("Connected to Postgres")
-	return conn, nil
-
+	fmt.Println("✅ Connected to Postgres (pool)")
+	return pool, nil
 }
