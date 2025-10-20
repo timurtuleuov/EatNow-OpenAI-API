@@ -39,3 +39,29 @@ func CreateUser(db *pgxpool.Pool, username, email, password, platform, deviceID 
 
 	return true, nil
 }
+
+func CheckUserExistsAndAuth(db *pgxpool.Pool, email, deviceID, password string) (bool, error) {
+	ctx := context.Background()
+
+	var storedHash string
+	var exists bool
+
+	// Ищем пользователя по email или device_id
+	err := db.QueryRow(ctx, `
+		SELECT password FROM users WHERE email = $1 OR device_id = $2;
+	`, email, deviceID).Scan(&storedHash)
+	if err != nil {
+		// Нет пользователя
+		return false, nil
+	}
+
+	// Проверяем пароль через bcrypt
+	err = bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
+	if err != nil {
+		// Пароль не совпал
+		return false, fmt.Errorf("invalid password")
+	}
+
+	exists = true
+	return exists, nil
+}
