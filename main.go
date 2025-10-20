@@ -22,6 +22,10 @@ func main() {
 	}
 	defer pool.Close()
 
+	if err := db.InitUserTable(pool); err != nil {
+		log.Fatalf("Failed to initialize users table: %v", err)
+	}
+
 	log.Println("Succesfully connected to the DB")
 
 	router := gin.Default()
@@ -39,21 +43,21 @@ func main() {
 	})
 	router.POST("/recipe", func(c *gin.Context) {
 		var body struct {
-			UserID string `json:"user"`
-			Prompt string `json:"prompt"`
+			DeviceID string `json:"device_id"`
+			Prompt   string `json:"prompt"`
 		}
 		if err := c.ShouldBindJSON(&body); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 			return
 		}
 
-		// Проверка, что user_id и prompt не пустые
-		if body.UserID == "" || body.Prompt == "" {
+		// Проверка, что device_id и prompt не пустые
+		if body.DeviceID == "" || body.Prompt == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "missing user_id or prompt"})
 			return
 		}
 
-		allowed, err := handlers.CanUsePrompt(pool, body.UserID)
+		allowed, err := handlers.CanUsePrompt(pool, body.DeviceID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 			return
@@ -71,5 +75,65 @@ func main() {
 
 		c.JSON(http.StatusOK, recipe)
 	})
+
+	router.POST("/auth/register", func(c *gin.Context) {
+		var body struct {
+			Username string `json:"username"`
+			Email    string `json:"email"`
+			Password string `json:"password"`
+			Platform string `json:"platform"`
+			DeviceID string `json:"device_id"`
+		}
+
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+			return
+		}
+
+		if body.Username == "" || body.Email == "" || body.Password == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
+			return
+		}
+
+		ok, err := handlers.CreateUser(pool, body.Username, body.Email, body.Password, body.Platform, body.DeviceID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "user not created"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "user registered successfully"})
+	})
+
+	router.POST("/auth/login", func(c *gin.Context) {
+		var body struct {
+			Email    string `json:"email"`
+			Password string `json:"password"`
+			DeviceID string `json:"device_id"`
+		}
+
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+			return
+		}
+
+		ok, err := handlers.CheckUserExistsAndAuth(pool, body.Email, body.DeviceID, body.Password)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
+
+		if !ok {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "login successful"})
+	})
+
 	router.Run("localhost:8080")
 }
