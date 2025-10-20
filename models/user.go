@@ -7,6 +7,7 @@ type User struct {
 	Name             string    `json:"name"`
 	Password         string    `json:"password"`
 	Email            string    `json:"email"`
+	DeviceID         string    `json:"device_id"`
 	Platform         string    `json:"platform"`
 	IsPremium        bool      `json:"is_premium" db:"is_premium"`
 	PremiumExpires   time.Time `json:"premium_expires" db:"premium_expires"`

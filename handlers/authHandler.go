@@ -10,6 +10,19 @@ import (
 
 func CreateUser(db *pgxpool.Pool, username, email, password, platform, deviceID string) (bool, error) {
 	ctx := context.Background()
+	var count int
+	err := db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM users WHERE email=$1 OR device_id=$2;`,
+		email, deviceID,
+	).Scan(&count)
+
+	if err != nil {
+		return false, fmt.Errorf("failed to check existing user: %w", err)
+	}
+
+	if count > 0 {
+		return false, fmt.Errorf("user with this email or device already exists")
+	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
