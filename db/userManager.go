@@ -14,6 +14,7 @@ func InitUserTable(db *sql.DB) error {
 		name VARCHAR(100) NOT NULL,
 		password VARCHAR(255) NOT NULL,
 		email VARCHAR(255) UNIQUE NOT NULL,
+		device_id VARCHAR(255),
 		platform VARCHAR(50),
 		is_premium BOOLEAN DEFAULT FALSE,
 		premium_expires TIMESTAMP WITH TIME ZONE,
