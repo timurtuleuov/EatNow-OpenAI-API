@@ -46,6 +46,33 @@ func CanUsePrompt(db *pgxpool.Pool, deviceID string) (bool, error) {
 
 	// Проверка лимита
 	if used >= FreeDailyLimit {
+		// 🔍 Проверяем наличие активного бонуса
+		var bonusID string
+		err := db.QueryRow(context.Background(), `
+			SELECT id FROM user_bonuses
+			WHERE device_id = $1
+			  AND status = 'active'
+			  AND (expires_at IS NULL OR expires_at > NOW())
+			ORDER BY issued_at ASC
+			LIMIT 1
+		`, deviceID).Scan(&bonusID)
+
+		if err == nil && bonusID != "" {
+			// 🔥 Используем бонус
+			_, err := db.Exec(context.Background(), `
+				UPDATE user_bonuses
+				SET status = 'used', used_at = NOW()
+				WHERE id = $1
+			`, bonusID)
+			if err != nil {
+				return false, err
+			}
+
+			// ✅ Разрешаем промпт, не увеличивая счётчик
+			return true, nil
+		}
+
+		// ❌ Нет бонуса → лимит исчерпан
 		return false, nil
 	}
 

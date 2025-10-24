@@ -68,7 +68,7 @@ func main() {
 			c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
 			return
 		}
-
+		handlers.GetFreePrompt(pool, body.DeviceID)
 		recipe, err := handlers.GetRecipeByPrompt(body.Prompt)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -99,7 +99,6 @@ func main() {
 	router.POST("/recipe/get-free", func(c *gin.Context) {
 		var body struct {
 			DeviceID string `json:"device_id"`
-	
 		}
 		if err := c.ShouldBindJSON(&body); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
@@ -112,7 +111,13 @@ func main() {
 			return
 		}
 
-		handlers.GetFreePrompt()
+		//bonus works 7 days
+		if err := handlers.GrantBonus(pool, body.DeviceID, "reward_ad", 168*time.Hour); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"status": "bonus granted"})
 	})
 
 	router.POST("/auth/register", func(c *gin.Context) {
