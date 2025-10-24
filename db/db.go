@@ -9,7 +9,7 @@ import (
 )
 
 func Connect() (*pgxpool.Pool, error) {
-	connStr := "postgres://core:12345678@localhost:5432/govault"
+	connStr := "postgres://core:12345678@localhost:5432/eatnow"
 	pool, err := pgxpool.New(context.Background(), connStr)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "unable to connect to database: %v\n", err)

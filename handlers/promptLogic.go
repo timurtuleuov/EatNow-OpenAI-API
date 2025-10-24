@@ -30,7 +30,7 @@ func CanUsePrompt(db *pgxpool.Pool, deviceID string) (bool, error) {
 	now := time.Now()
 
 	// Премиум — без лимита
-	if isPremium && premiumExpires != nil && premiumExpires.After(now) {
+	if isPremium && premiumExpires != nil && premiumExpires.UTC().After(now.UTC()) {
 		return true, nil
 	}
 

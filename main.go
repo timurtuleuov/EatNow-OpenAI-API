@@ -1,10 +1,12 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"openai/db"
 	handlers "openai/handlers"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -22,7 +24,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	if err := db.InitUserTable(pool); err != nil {
+	if err := db.InitTables(pool); err != nil {
 		log.Fatalf("Failed to initialize users table: %v", err)
 	}
 
@@ -53,7 +55,7 @@ func main() {
 
 		// Проверка, что device_id и prompt не пустые
 		if body.DeviceID == "" || body.Prompt == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "missing user_id or prompt"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing device_id or prompt"})
 			return
 		}
 
@@ -70,10 +72,47 @@ func main() {
 		recipe, err := handlers.GetRecipeByPrompt(body.Prompt)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+
+			return
+		}
+		start := time.Now()
+		recipe, err = handlers.GetRecipeByPrompt(body.Prompt)
+		duration := time.Since(start).Milliseconds()
+
+		log := handlers.PromptLog{
+			DeviceID:   body.DeviceID,
+			Prompt:     body.Prompt,
+			Response:   recipe,
+			Model:      "gpt-4o-mini",
+			DurationMs: int(duration),
+			Success:    err == nil,
+			ErrorMsg:   fmt.Sprintf("%v", err),
+			AppVersion: "1.0.0",
+			Language:   "ru",
+			Country:    "KZ",
+		}
+		_ = handlers.LogPrompt(pool, log)
+
+		c.JSON(http.StatusOK, recipe)
+	})
+
+	router.POST("/recipe/get-free", func(c *gin.Context) {
+		var body struct {
+			DeviceID string `json:"device_id"`
+	
+		}
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 			return
 		}
 
-		c.JSON(http.StatusOK, recipe)
+		// Проверка, что device_id и prompt не пустые
+		if body.DeviceID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing device_id or prompt"})
+			return
+		}
+
+		handlers.GetFreePrompt()
 	})
 
 	router.POST("/auth/register", func(c *gin.Context) {
