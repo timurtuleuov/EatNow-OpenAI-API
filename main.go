@@ -68,15 +68,15 @@ func main() {
 			c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
 			return
 		}
-		handlers.GetFreePrompt(pool, body.DeviceID)
+		// handlers.GetFreePrompt(pool, body.DeviceID)
+		start := time.Now()
 		recipe, err := handlers.GetRecipeByPrompt(body.Prompt)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 
 			return
 		}
-		start := time.Now()
-		recipe, err = handlers.GetRecipeByPrompt(body.Prompt)
+
 		duration := time.Since(start).Milliseconds()
 
 		log := handlers.PromptLog{

@@ -18,23 +18,26 @@ func CanUsePrompt(db *pgxpool.Pool, deviceID string) (bool, error) {
 		SELECT is_premium, premium_expires, daily_used_prompts, last_prompt_date
 		FROM users
 		WHERE device_id = $1
-		ORDER BY created_at DESC
 		LIMIT 1
 	`, deviceID).Scan(&isPremium, &premiumExpires, &used, &lastPromptDate)
+
+	// Новый пользователь
 	if err != nil {
-		// нет пользователя с таким device_id — значит новый девайс
-		// можно разрешить 1-й промпт
-		return true, nil
+		_, err = db.Exec(context.Background(), `
+			INSERT INTO users (device_id, daily_used_prompts, last_prompt_date)
+			VALUES ($1, 1, NOW())
+		`, deviceID)
+		return true, err
 	}
 
 	now := time.Now()
 
-	// Премиум — без лимита
-	if isPremium && premiumExpires != nil && premiumExpires.UTC().After(now.UTC()) {
+	// 🔓 Премиум — без лимита
+	if isPremium && premiumExpires != nil && premiumExpires.After(now) {
 		return true, nil
 	}
 
-	// Новая дата → сброс счётчика
+	// 🔁 Новый день → сбрасываем счётчик
 	if lastPromptDate == nil || lastPromptDate.Format("2006-01-02") != now.Format("2006-01-02") {
 		_, err = db.Exec(context.Background(), `
 			UPDATE users
@@ -44,9 +47,8 @@ func CanUsePrompt(db *pgxpool.Pool, deviceID string) (bool, error) {
 		return true, err
 	}
 
-	// Проверка лимита
+	// 🚫 Превышен лимит — проверяем бонус
 	if used >= FreeDailyLimit {
-		// 🔍 Проверяем наличие активного бонуса
 		var bonusID string
 		err := db.QueryRow(context.Background(), `
 			SELECT id FROM user_bonuses
@@ -58,7 +60,7 @@ func CanUsePrompt(db *pgxpool.Pool, deviceID string) (bool, error) {
 		`, deviceID).Scan(&bonusID)
 
 		if err == nil && bonusID != "" {
-			// 🔥 Используем бонус
+			// 🪙 Используем бонус
 			_, err := db.Exec(context.Background(), `
 				UPDATE user_bonuses
 				SET status = 'used', used_at = NOW()
@@ -68,18 +70,19 @@ func CanUsePrompt(db *pgxpool.Pool, deviceID string) (bool, error) {
 				return false, err
 			}
 
-			// ✅ Разрешаем промпт, не увеличивая счётчик
+			// 💥 Не трогаем счётчик, просто разрешаем промпт
 			return true, nil
 		}
 
-		// ❌ Нет бонуса → лимит исчерпан
+		// ❌ Нет бонуса — лимит исчерпан
 		return false, nil
 	}
 
-	// Увеличиваем счётчик
+	// ✅ Всё ок, инкрементируем счётчик
 	_, err = db.Exec(context.Background(), `
 		UPDATE users
-		SET daily_used_prompts = daily_used_prompts + 1
+		SET daily_used_prompts = daily_used_prompts + 1,
+		    last_prompt_date = NOW()
 		WHERE device_id = $1
 	`, deviceID)
 	return err == nil, err

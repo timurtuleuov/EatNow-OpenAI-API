@@ -47,7 +47,7 @@ func InitTables(pool *pgxpool.Pool) error {
 		created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 	);
 
-	CREATE TABLE user_bonuses (
+	CREATE TABLE IF NOT EXISTS user_bonuses (
 		id SERIAL PRIMARY KEY,
 		user_id UUID REFERENCES users(id) ON DELETE CASCADE,
 		device_id VARCHAR(255) NOT NULL,
