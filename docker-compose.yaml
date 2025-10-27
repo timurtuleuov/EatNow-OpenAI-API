@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  app:
+    build: .
+    env_file:
+    - dependencies.env
+    container_name: eatnow_app
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - POSTGRES_USER=core
+      - POSTGRES_PASSWORD=12345678
+      - POSTGRES_DB=eatnow
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+    depends_on:
+      - db
+   
+
+  db:
+    image: postgres:16
+    container_name: eatnow_db
+    restart: always
+    environment:
+      - POSTGRES_USER=core
+      - POSTGRES_PASSWORD=12345678
+      - POSTGRES_DB=eatnow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+volumes:
+  pgdata:

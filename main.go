@@ -43,6 +43,12 @@ func main() {
 
 		c.Next()
 	})
+
+	router.GET("/home", func(c *gin.Context) {
+		c.JSON(http.StatusAccepted, gin.H{"msg": "Hello"})
+		return
+	})
+
 	router.POST("/recipe", func(c *gin.Context) {
 		var body struct {
 			DeviceID string `json:"device_id"`
@@ -179,5 +185,5 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"message": "login successful"})
 	})
 
-	router.Run("localhost:8080")
+	router.Run(":8080")
 }
