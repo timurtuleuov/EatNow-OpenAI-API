@@ -130,28 +130,20 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "bonus granted"})
 	})
 
-	router.GET("/user/prompts-count", func(c *gin.Context) {
-		var body struct {
-			Email string `json:"email"`
-		}
-
-		if err := c.ShouldBindJSON(&body); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
-			return
-		}
-
-		if body.Email == "" {
+	router.GET("/user/prompts-count/:email", func(c *gin.Context) {
+		email := c.Param("email")
+		print(email)
+		if email == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
 			return
 		}
 
-		userFreePromptsCount, err := handlers.GetUserFreePromptsCount(pool, body.Email)
+		userFreePromptsCount, err := handlers.GetUserFreePromptsCount(pool, email)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"userFreePromptsCount": userFreePromptsCount})
-		return
+		c.JSON(http.StatusOK, gin.H{"userFreePromptsCount": userFreePromptsCount})
 
 	})
 
