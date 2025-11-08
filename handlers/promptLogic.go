@@ -9,7 +9,7 @@ import (
 
 const FreeDailyLimit = 5
 
-func CanUsePrompt(db *pgxpool.Pool, deviceID string) (bool, error) {
+func CanUsePrompt(db *pgxpool.Pool, email string) (bool, error) {
 	var isPremium bool
 	var premiumExpires, lastPromptDate *time.Time
 	var used int
@@ -17,16 +17,16 @@ func CanUsePrompt(db *pgxpool.Pool, deviceID string) (bool, error) {
 	err := db.QueryRow(context.Background(), `
 		SELECT is_premium, premium_expires, daily_used_prompts, last_prompt_date
 		FROM users
-		WHERE device_id = $1
+		WHERE email = $1
 		LIMIT 1
-	`, deviceID).Scan(&isPremium, &premiumExpires, &used, &lastPromptDate)
+	`, email).Scan(&isPremium, &premiumExpires, &used, &lastPromptDate)
 
 	// Новый пользователь
 	if err != nil {
 		_, err = db.Exec(context.Background(), `
-			INSERT INTO users (device_id, daily_used_prompts, last_prompt_date)
+			INSERT INTO users (email, daily_used_prompts, last_prompt_date)
 			VALUES ($1, 1, NOW())
-		`, deviceID)
+		`, email)
 		return true, err
 	}
 
@@ -41,9 +41,9 @@ func CanUsePrompt(db *pgxpool.Pool, deviceID string) (bool, error) {
 	if lastPromptDate == nil || lastPromptDate.Format("2006-01-02") != now.Format("2006-01-02") {
 		_, err = db.Exec(context.Background(), `
 			UPDATE users
-			SET daily_used_prompts = 1, last_prompt_date = $2
-			WHERE device_id = $1
-		`, deviceID, now)
+			SET daily_used_prompts = 0, last_prompt_date = $2
+			WHERE email = $1
+		`, email, now)
 		return true, err
 	}
 
@@ -52,12 +52,12 @@ func CanUsePrompt(db *pgxpool.Pool, deviceID string) (bool, error) {
 		var bonusID string
 		err := db.QueryRow(context.Background(), `
 			SELECT id FROM user_bonuses
-			WHERE device_id = $1
+			WHERE email = $1
 			  AND status = 'active'
 			  AND (expires_at IS NULL OR expires_at > NOW())
 			ORDER BY issued_at ASC
 			LIMIT 1
-		`, deviceID).Scan(&bonusID)
+		`, email).Scan(&bonusID)
 
 		if err == nil && bonusID != "" {
 			// 🪙 Используем бонус
@@ -83,7 +83,7 @@ func CanUsePrompt(db *pgxpool.Pool, deviceID string) (bool, error) {
 		UPDATE users
 		SET daily_used_prompts = daily_used_prompts + 1,
 		    last_prompt_date = NOW()
-		WHERE device_id = $1
-	`, deviceID)
+		WHERE email = $1
+	`, email)
 	return err == nil, err
 }

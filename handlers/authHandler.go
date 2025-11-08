@@ -12,8 +12,8 @@ func CreateUser(db *pgxpool.Pool, username, email, password, platform, deviceID 
 	ctx := context.Background()
 	var count int
 	err := db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM users WHERE email=$1 OR device_id=$2;`,
-		email, deviceID,
+		`SELECT COUNT(*) FROM users WHERE email=$1;`,
+		email,
 	).Scan(&count)
 
 	if err != nil {
@@ -48,8 +48,8 @@ func CheckUserExistsAndAuth(db *pgxpool.Pool, email, deviceID, password string) 
 
 	// Ищем пользователя по email или device_id
 	err := db.QueryRow(ctx, `
-		SELECT password FROM users WHERE email = $1 OR device_id = $2;
-	`, email, deviceID).Scan(&storedHash)
+		SELECT password FROM users WHERE email = $1;
+	`, email).Scan(&storedHash)
 	if err != nil {
 		// Нет пользователя
 		return false, nil

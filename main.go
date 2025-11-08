@@ -51,35 +51,39 @@ func main() {
 
 	router.POST("/recipe", func(c *gin.Context) {
 		var body struct {
+			Email    string `json:"email"`
 			DeviceID string `json:"device_id"`
 			Prompt   string `json:"prompt"`
 		}
 		if err := c.ShouldBindJSON(&body); err != nil {
+			log.Println("❌ JSON bind error:", err)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 			return
 		}
 
-		// Проверка, что device_id и prompt не пустые
-		if body.DeviceID == "" || body.Prompt == "" {
+		if body.Email == "" || body.Prompt == "" {
+			log.Printf("❌ Missing fields: email='%s' prompt='%s'\n", body.Email, body.Prompt)
 			c.JSON(http.StatusBadRequest, gin.H{"error": "missing device_id or prompt"})
 			return
 		}
 
-		allowed, err := handlers.CanUsePrompt(pool, body.DeviceID)
+		allowed, err := handlers.CanUsePrompt(pool, body.Email)
 		if err != nil {
+			log.Println("❌ DB error in CanUsePrompt:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 			return
 		}
 		if !allowed {
+			log.Println("❌ Daily limit reached for", body.Email)
 			c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
 			return
 		}
-		// handlers.GetFreePrompt(pool, body.DeviceID)
+
 		start := time.Now()
 		recipe, err := handlers.GetRecipeByPrompt(body.Prompt)
 		if err != nil {
+			log.Println("❌ Recipe generation error:", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-
 			return
 		}
 
@@ -104,7 +108,7 @@ func main() {
 
 	router.POST("/recipe/get-free", func(c *gin.Context) {
 		var body struct {
-			DeviceID string `json:"device_id"`
+			Email string `json:"email"`
 		}
 		if err := c.ShouldBindJSON(&body); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
@@ -112,18 +116,43 @@ func main() {
 		}
 
 		// Проверка, что device_id и prompt не пустые
-		if body.DeviceID == "" {
+		if body.Email == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "missing device_id or prompt"})
 			return
 		}
 
 		//bonus works 7 days
-		if err := handlers.GrantBonus(pool, body.DeviceID, "reward_ad", 168*time.Hour); err != nil {
+		if err := handlers.GrantBonus(pool, body.Email, "reward_ad", 168*time.Hour); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{"status": "bonus granted"})
+	})
+
+	router.GET("/user/prompts-count", func(c *gin.Context) {
+		var body struct {
+			Email string `json:"email"`
+		}
+
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+			return
+		}
+
+		if body.Email == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
+			return
+		}
+
+		userFreePromptsCount, err := handlers.GetUserFreePromptsCount(pool, body.Email)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"userFreePromptsCount": userFreePromptsCount})
+		return
+
 	})
 
 	router.POST("/auth/register", func(c *gin.Context) {
