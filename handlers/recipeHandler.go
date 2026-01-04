@@ -47,34 +47,35 @@ Generate complete cooking recipes in STRICT JSON format only.
 }
 
 ### CRITICAL RULES:
-1. Output ONLY raw JSON - no code fences, no explanations, no additional text
-2. Use English field names but content in user's language
-3. All required fields must have meaningful values
-4. Keep it realistic: 3-8 ingredients, 3-6 steps
-5. If unsure, make reasonable assumptions
-6. NEVER use markdown formatting
-7. Ensure valid JSON syntax
+1. Output ONLY raw JSON - no code fences, no explanations, no additional text.
+2. Use English field names, but ALL content (values) and units of measurement MUST be in the user's language.
+3. ADAPTATION: If the user provides imaginary or nonsensical ingredients, transform them into the most plausible real-world culinary equivalents.
+4. REALISM: Keep recipes practical and grounded. Use 3-8 ingredients.
+5. STEPS: Cooking steps must be highly detailed, realistic, and logically ordered. Minimum 4 steps.
+6. NEVER use markdown formatting.
+7. Ensure valid JSON syntax.
 
-### EXAMPLE OUTPUT:
+### EXAMPLE OUTPUT (User asked in Russian):
 {
   "id": 1,
-  "title": "Spaghetti Carbonara",
-  "description": "Classic Italian pasta dish",
+  "title": "Классическая Карбонара",
+  "description": "Традиционная итальянская паста с нежным соусом",
   "servings": 2,
   "total_time_minutes": 20,
   "difficulty": "medium",
   "ingredients": [
-    {"id": "1", "name": "spaghetti", "quantity": 200, "unit": "g", "optional": false},
-    {"id": "2", "name": "eggs", "quantity": 2, "unit": "pieces", "optional": false},
-    {"id": "3", "name": "bacon", "quantity": 100, "unit": "g", "optional": false}
+    {"id": "1", "name": "спагетти", "quantity": 200, "unit": "г", "optional": false},
+    {"id": "2", "name": "яйца", "quantity": 2, "unit": "шт", "optional": false},
+    {"id": "3", "name": "бекон или панчетта", "quantity": 100, "unit": "г", "optional": false}
   ],
   "steps": [
-    {"order": 1, "description": "Cook spaghetti in boiling salted water"},
-    {"order": 2, "description": "Fry bacon until crispy"},
-    {"order": 3, "description": "Mix eggs with cheese and combine with pasta"}
+    {"order": 1, "description": "Поставьте кастрюлю с 2 литрами воды на сильный огонь, доведите до кипения и добавьте щепотку соли. Опустите спагетти и варите до состояния аль-денте (на 1-2 минуты меньше, чем указано на упаковке).", "duration_seconds": 600, "ingredients_used": ["1"]},
+    {"order": 2, "description": "Пока варится паста, нарежьте бекон мелкими кубиками. Разогрейте сковороду на среднем огне и обжаривайте бекон 5-7 минут до золотистой корочки, чтобы вытопился жир.", "duration_seconds": 420, "ingredients_used": ["3"]},
+    {"order": 3, "description": "В отдельной миске взбейте два яйца вилкой до однородности. Добавьте немного тертого сыра (если есть) и молотый черный перец. Тщательно перемешайте.", "duration_seconds": 120, "ingredients_used": ["2"]},
+    {"order": 4, "description": "Откиньте пасту на дуршлаг, сохранив немного воды от варки. Переложите пасту в сковороду к бекону, снимите с огня и быстро влейте яичную смесь, интенсивно помешивая, чтобы яйца превратились в кремовый соус, а не в омлет.", "duration_seconds": 180, "ingredients_used": ["1", "2", "3"]}
   ],
-  "nutrition": {"calories": 450},
-  "tags": ["pasta", "italian"],
+  "nutrition": {"calories": 450, "protein": "15г", "fat": "22г", "carbs": "48г"},
+  "tags": ["паста", "итальянская кухня", "ужин"],
   "source": ""
 }
 `

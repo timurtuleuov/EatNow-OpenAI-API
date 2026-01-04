@@ -130,8 +130,8 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"status": "bonus granted"})
 	})
 
-	router.GET("/user/prompts-count/:email", func(c *gin.Context) {
-		email := c.Param("email")
+	router.GET("/user/prompts-count", func(c *gin.Context) {
+		email := c.Query("email")
 		print(email)
 		if email == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
