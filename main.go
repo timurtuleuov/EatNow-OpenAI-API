@@ -8,6 +8,7 @@ import (
 	handlers "openai/handlers"
 	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -31,7 +32,13 @@ func main() {
 	log.Println("Succesfully connected to the DB")
 
 	router := gin.Default()
-
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"}, // Для теста, потом замени на свой домен
+		AllowMethods:     []string{"POST", "GET", "OPTIONS", "PUT", "DELETE"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+	}))
 	auth := router.Group("/auth")
 	{
 		auth.POST("/register", func(c *gin.Context) {
@@ -78,14 +85,16 @@ func main() {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "could not save session"})
 					return
 				}
-				c.JSON(http.StatusOK, gin.H{"token": token})
+				c.JSON(http.StatusOK, gin.H{
+					"access_token":  token,
+					"refresh_token": refreshToken,
+				})
 			}
 		})
 		auth.POST("/login", func(c *gin.Context) {
 			var body struct {
 				Email    string `json:"email"`
 				Password string `json:"password"`
-				DeviceID string `json:"device_id"`
 			}
 
 			if err := c.ShouldBindJSON(&body); err != nil {
@@ -93,7 +102,11 @@ func main() {
 				return
 			}
 
-			ok, err := handlers.CheckUserExistsAndAuth(pool, body.Email, body.DeviceID, body.Password)
+			log.Printf("🚀 Попытка входа:")
+			log.Printf("   Email: [%s]", body.Email)
+			log.Printf("   Password length: %d", len(body.Password)) // Пароли лучше не логировать целиком
+
+			ok, err := handlers.CheckUserExistsAndAuth(pool, body.Email, body.Password)
 			if err != nil {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 				return
@@ -119,8 +132,35 @@ func main() {
 					return
 				}
 
-				c.JSON(http.StatusOK, gin.H{"token": token})
+				c.JSON(http.StatusOK, gin.H{
+					"access_token":  token,
+					"refresh_token": refreshToken,
+				})
 			}
+		})
+
+		auth.POST("/refresh", func(c *gin.Context) {
+
+			var body struct {
+				Email        string `json:"email"`
+				RefreshToken string `json:"refresh_token"`
+			}
+			if err := c.ShouldBindJSON(&body); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+				return
+			}
+
+			err := handlers.VerifyRefreshToken(pool, body.Email, body.RefreshToken)
+			if err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+				return
+			}
+
+			newAccessToken, _ := handlers.GenerateJWT(body.Email)
+
+			c.JSON(http.StatusOK, gin.H{
+				"access_token": newAccessToken,
+			})
 		})
 	}
 
@@ -222,14 +262,14 @@ func main() {
 		})
 
 		protected.GET("/user/prompts-count", func(c *gin.Context) {
-			email := c.Query("email")
-			print(email)
-			if email == "" {
+			userEmail, _ := c.Get("email")
+			print(userEmail.(string))
+			if userEmail.(string) == "" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
 				return
 			}
 
-			userFreePromptsCount, err := handlers.GetUserFreePromptsCount(pool, email)
+			userFreePromptsCount, err := handlers.GetUserFreePromptsCount(pool, userEmail.(string))
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return

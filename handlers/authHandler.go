@@ -46,7 +46,7 @@ func CreateUser(db *pgxpool.Pool, username, email, password, platform, deviceID 
 	return true, nil
 }
 
-func CheckUserExistsAndAuth(db *pgxpool.Pool, email, deviceID, password string) (bool, error) {
+func CheckUserExistsAndAuth(db *pgxpool.Pool, email, password string) (bool, error) {
 	ctx := context.Background()
 
 	var storedHash string
@@ -104,12 +104,58 @@ func AuthMiddleware() gin.HandlerFunc {
 
 func SaveRefreshToken(db *pgxpool.Pool, email, token string) error {
 	ctx := context.Background()
+
 	expiresAt := time.Now().Add(6 * 30 * 24 * time.Hour)
 
-	_, err := db.Exec(ctx, `
-        INSERT INTO refresh_tokens (email, token, expires_at)
-        VALUES ($1, $2, $3)
-    `, email, token, expiresAt)
+	hashedToken, err := bcrypt.GenerateFromPassword([]byte(token), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
 
+	query := `
+		INSERT INTO refresh_tokens (user_email, token, expires_at, created_at)
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (user_email) 
+		DO UPDATE SET 
+			token = EXCLUDED.token,
+			expires_at = EXCLUDED.expires_at,
+			created_at = NOW();
+	`
+
+	_, err = db.Exec(ctx, query, email, string(hashedToken), expiresAt)
 	return err
+}
+
+func VerifyRefreshToken(db *pgxpool.Pool, email, rawToken string) error {
+	ctx := context.Background()
+
+	var hashedToken string
+	var expiresAt time.Time
+
+	// Берем только одну, самую свежую запись по дате создания
+	err := db.QueryRow(ctx, `
+        SELECT token, expires_at 
+        FROM refresh_tokens 
+        WHERE user_email = $1 
+        ORDER BY created_at DESC 
+        LIMIT 1
+    `, email).Scan(&hashedToken, &expiresAt)
+
+	if err != nil {
+		// Если записей нет, Scan вернет ошибку
+		return fmt.Errorf("no session found for this user")
+	}
+
+	// 1. Проверяем срок годности
+	if time.Now().After(expiresAt) {
+		return fmt.Errorf("refresh token expired")
+	}
+
+	// 2. Сверяем хэш bcrypt с тем, что прислал клиент
+	err = bcrypt.CompareHashAndPassword([]byte(hashedToken), []byte(rawToken))
+	if err != nil {
+		return fmt.Errorf("invalid refresh token")
+	}
+
+	return nil
 }

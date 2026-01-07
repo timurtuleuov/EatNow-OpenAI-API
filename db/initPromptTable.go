@@ -63,7 +63,7 @@ func InitTables(pool *pgxpool.Pool) error {
 	-- 4. Создаём таблицу refresh токенов
 	CREATE TABLE IF NOT EXISTS refresh_tokens (
 		id SERIAL PRIMARY KEY,
-		user_email VARCHAR(255) NOT NULL,
+		user_email VARCHAR(255) UNIQUE NOT NULL,
 		token TEXT NOT NULL,
 		expires_at TIMESTAMP NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
