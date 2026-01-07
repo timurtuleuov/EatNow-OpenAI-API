@@ -177,7 +177,14 @@ func main() {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "user registered successfully"})
+		if ok {
+			token, err := handlers.GenerateJWT(body.Email)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "could not generate token"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"token": token})
+		}
 	})
 
 	router.POST("/auth/login", func(c *gin.Context) {
@@ -203,7 +210,14 @@ func main() {
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "login successful"})
+		if ok {
+			token, err := handlers.GenerateJWT(body.Email)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "could not generate token"})
+				return
+			}
+			c.JSON(http.StatusOK, gin.H{"token": token})
+		}
 	})
 
 	router.Run(":8080")
