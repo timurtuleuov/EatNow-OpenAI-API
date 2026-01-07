@@ -47,6 +47,7 @@ func InitTables(pool *pgxpool.Pool) error {
 		created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 	);
 
+	-- 3. Создаём таблицу бонусов
 	CREATE TABLE IF NOT EXISTS user_bonuses (
 		id SERIAL PRIMARY KEY,
 		user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -57,6 +58,15 @@ func InitTables(pool *pgxpool.Pool) error {
 		used_at TIMESTAMPTZ,
 		expires_at TIMESTAMPTZ,                
 		meta JSONB DEFAULT '{}'::jsonb          
+	);
+
+	-- 4. Создаём таблицу refresh токенов
+	CREATE TABLE IF NOT EXISTS refresh_tokens (
+		id SERIAL PRIMARY KEY,
+		user_email VARCHAR(255) NOT NULL,
+		token TEXT NOT NULL,
+		expires_at TIMESTAMP NOT NULL,
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 	`
 

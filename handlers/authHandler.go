@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"time"
+
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -98,4 +100,16 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("email", claims.Email)
 		c.Next()
 	}
+}
+
+func SaveRefreshToken(db *pgxpool.Pool, email, token string) error {
+	ctx := context.Background()
+	expiresAt := time.Now().Add(6 * 30 * 24 * time.Hour)
+
+	_, err := db.Exec(ctx, `
+        INSERT INTO refresh_tokens (email, token, expires_at)
+        VALUES ($1, $2, $3)
+    `, email, token, expiresAt)
+
+	return err
 }

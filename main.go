@@ -66,8 +66,16 @@ func main() {
 
 			if ok {
 				token, err := handlers.GenerateJWT(body.Email)
+				refreshToken, _ := handlers.GenerateRefreshToken()
+
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "could not generate token"})
+					return
+				}
+
+				err = handlers.SaveRefreshToken(pool, body.Email, refreshToken)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "could not save session"})
 					return
 				}
 				c.JSON(http.StatusOK, gin.H{"token": token})
@@ -98,10 +106,19 @@ func main() {
 
 			if ok {
 				token, err := handlers.GenerateJWT(body.Email)
+				refreshToken, _ := handlers.GenerateRefreshToken()
+
 				if err != nil {
 					c.JSON(http.StatusInternalServerError, gin.H{"error": "could not generate token"})
 					return
 				}
+
+				err = handlers.SaveRefreshToken(pool, body.Email, refreshToken)
+				if err != nil {
+					c.JSON(http.StatusInternalServerError, gin.H{"error": "could not save session"})
+					return
+				}
+
 				c.JSON(http.StatusOK, gin.H{"token": token})
 			}
 		})
@@ -128,31 +145,33 @@ func main() {
 		})
 
 		protected.POST("/recipe", func(c *gin.Context) {
+			userEmail, _ := c.Get("email")
+
 			var body struct {
-				Email    string `json:"email"`
 				DeviceID string `json:"device_id"`
 				Prompt   string `json:"prompt"`
 			}
+
 			if err := c.ShouldBindJSON(&body); err != nil {
 				log.Println("❌ JSON bind error:", err)
 				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 				return
 			}
 
-			if body.Email == "" || body.Prompt == "" {
-				log.Printf("❌ Missing fields: email='%s' prompt='%s'\n", body.Email, body.Prompt)
+			if body.Prompt == "" {
+				log.Printf("❌ Missing fields: prompt='%s'\n", body.Prompt)
 				c.JSON(http.StatusBadRequest, gin.H{"error": "missing device_id or prompt"})
 				return
 			}
 
-			allowed, err := handlers.CanUsePrompt(pool, body.Email)
+			allowed, err := handlers.CanUsePrompt(pool, userEmail.(string))
 			if err != nil {
 				log.Println("❌ DB error in CanUsePrompt:", err)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 				return
 			}
 			if !allowed {
-				log.Println("❌ Daily limit reached for", body.Email)
+				log.Println("❌ Daily limit reached for", userEmail.(string))
 				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
 				return
 			}
@@ -185,22 +204,16 @@ func main() {
 		})
 
 		protected.POST("/recipe/get-free", func(c *gin.Context) {
-			var body struct {
-				Email string `json:"email"`
-			}
-			if err := c.ShouldBindJSON(&body); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
-				return
-			}
+			userEmail, _ := c.Get("email")
 
 			// Проверка, что device_id и prompt не пустые
-			if body.Email == "" {
+			if userEmail.(string) == "" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "missing device_id or prompt"})
 				return
 			}
 
 			//bonus works 7 days
-			if err := handlers.GrantBonus(pool, body.Email, "reward_ad", 168*time.Hour); err != nil {
+			if err := handlers.GrantBonus(pool, userEmail.(string), "reward_ad", 168*time.Hour); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
@@ -225,10 +238,6 @@ func main() {
 
 		})
 	}
-
-	// router.POST("/auth/register"
-
-	// router.POST("/auth/login"
 
 	router.Run(":8080")
 }
