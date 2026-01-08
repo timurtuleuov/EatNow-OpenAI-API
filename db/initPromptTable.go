@@ -68,6 +68,30 @@ func InitTables(pool *pgxpool.Pool) error {
 		expires_at TIMESTAMP NOT NULL,
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
+
+	-- 5. Создаем таблицу с платежами
+	CREATE TABLE payments (
+		id SERIAL PRIMARY KEY,
+		user_email TEXT NOT NULL REFERENCES users(email), 
+		subscription_type TEXT NOT NULL,                  -- premium_subscription_monthly
+		amount NUMERIC(10, 2) NOT NULL,                   -- 2.99
+		currency TEXT NOT NULL DEFAULT 'USD',             -- USD, KZT и т.д.
+		platform TEXT NOT NULL,                           -- android или ios
+		
+		-- Статус платежа
+		status TEXT NOT NULL,                             -- completed, expired, refunded
+		
+		-- Данные от Google/Apple
+		transaction_id TEXT UNIQUE NOT NULL,              -- Уникальный ID транзакции от Google
+		purchase_token TEXT NOT NULL,                     -- Нужен для проверки/рефреша
+		
+		-- Даты
+		created_at TIMESTAMP DEFAULT NOW(),               -- Когда совершена покупка
+		expires_at TIMESTAMP NOT NULL,                    -- Когда подписка закончится
+		
+		-- Мой вариант полезного поля:
+		is_auto_renewing BOOLEAN DEFAULT TRUE             -- Продлевается ли подписка автоматически
+	);
 	`
 
 	_, err := pool.Exec(ctx, script)
