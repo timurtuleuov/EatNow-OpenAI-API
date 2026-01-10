@@ -70,7 +70,7 @@ func InitTables(pool *pgxpool.Pool) error {
 	);
 
 	-- 5. Создаем таблицу с платежами
-	CREATE TABLE payments (
+	CREATE TABLE IF NOT EXISTS payments (
 		id SERIAL PRIMARY KEY,
 		user_email TEXT NOT NULL REFERENCES users(email), 
 		subscription_type TEXT NOT NULL,                  -- premium_subscription_monthly
