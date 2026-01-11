@@ -159,3 +159,32 @@ func VerifyRefreshToken(db *pgxpool.Pool, email, rawToken string) error {
 
 	return nil
 }
+
+func GetMe(db *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		email, _ := c.Get("email") // Достаем из JWT middleware
+
+		var isPremium bool
+		var expiresAt *time.Time
+
+		err := db.QueryRow(context.Background(),
+			"SELECT is_premium, premium_expires FROM users WHERE email = $1",
+			email).Scan(&isPremium, &expiresAt)
+
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			return
+		}
+
+		// Проверка: если в БД true, но время вышло — отдаем false
+		if isPremium && expiresAt != nil && expiresAt.Before(time.Now()) {
+			isPremium = false
+			// Можно тут же фоном обновить БД, чтобы не считать лишний раз
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"email":      email,
+			"is_premium": isPremium,
+		})
+	}
+}

@@ -184,6 +184,8 @@ func main() {
 			return
 		})
 
+		protected.GET("/me", handlers.GetMe(pool))
+
 		protected.POST("/recipe", func(c *gin.Context) {
 			userEmail, _ := c.Get("email")
 
@@ -277,6 +279,13 @@ func main() {
 			c.JSON(http.StatusOK, gin.H{"userFreePromptsCount": userFreePromptsCount})
 
 		})
+
+		//payments
+		payments := protected.Group("/payments")
+		{
+			payments.POST("/verify-google", handlers.VerifyGooglePurchase(pool))
+		}
+
 	}
 
 	router.Run(":8080")
