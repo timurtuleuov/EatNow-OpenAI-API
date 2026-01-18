@@ -106,7 +106,7 @@ func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
 	if err != nil {
 		return nil, fmt.Errorf("OpenAI request failed: %w", err)
 	}
-	fmt.Println("🧾 RAW RESPONSE:", resp)
+	// fmt.Println("🧾 RAW RESPONSE:", resp)
 
 	// 5️⃣ Проверяем ответ
 	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {

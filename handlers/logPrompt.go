@@ -27,14 +27,28 @@ type PromptLog struct {
 func LogPrompt(db *pgxpool.Pool, log PromptLog) error {
 	ctx := context.Background()
 
+	var recipeId string
+
 	respJSON, err := json.Marshal(log.Response)
 	if err != nil {
 		respJSON = []byte("{}")
 	}
+	err = db.QueryRow(ctx, `
+	INSERT INTO recipes (
+			recipe
+		) VALUES ($1)
+		 RETURNING id
+	`, respJSON,
+	).Scan(&recipeId)
+
+	if err != nil {
+		fmt.Printf("[LogPrompt] Error inserting recipe: %v\n", err)
+		return fmt.Errorf("failed to insert recipe: %w", err)
+	}
 
 	_, err = db.Exec(ctx, `
 		INSERT INTO prompts (
-			user_id, device_id, prompt, response, tokens_used, model,
+			user_id, device_id, prompt, recipe_id, tokens_used, model,
 			duration_ms, success, error_message, app_version,
 			language, country, created_at
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
@@ -42,7 +56,7 @@ func LogPrompt(db *pgxpool.Pool, log PromptLog) error {
 		log.UserID,
 		log.DeviceID,
 		log.Prompt,
-		respJSON,
+		recipeId,
 		log.TokensUsed,
 		log.Model,
 		log.DurationMs,

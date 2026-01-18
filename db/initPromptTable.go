@@ -29,13 +29,19 @@ func InitTables(pool *pgxpool.Pool) error {
 		updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 	);
 
-	-- 2. Создаём таблицу логов (prompts)
+	-- 2. Отдельная таблица для рецептов
+	CREATE TABLE IF NOT EXISTS recipes (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	recipe JSONB
+	);
+
+	-- 3. Создаём таблицу логов (prompts)
 	CREATE TABLE IF NOT EXISTS prompts (
 		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 		user_id UUID REFERENCES users(id) ON DELETE CASCADE,
 		device_id VARCHAR(255),
 		prompt TEXT NOT NULL,
-		response JSONB,
+		recipe_id UUID REFERENCES recipes(id) ON DELETE CASCADE,
 		tokens_used INT DEFAULT 0,
 		model VARCHAR(100),
 		duration_ms INT,
@@ -47,7 +53,7 @@ func InitTables(pool *pgxpool.Pool) error {
 		created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 	);
 
-	-- 3. Создаём таблицу бонусов
+	-- 4. Создаём таблицу бонусов
 	CREATE TABLE IF NOT EXISTS user_bonuses (
 		id SERIAL PRIMARY KEY,
 		user_id UUID REFERENCES users(id) ON DELETE CASCADE,
@@ -60,7 +66,7 @@ func InitTables(pool *pgxpool.Pool) error {
 		meta JSONB DEFAULT '{}'::jsonb          
 	);
 
-	-- 4. Создаём таблицу refresh токенов
+	-- 5. Создаём таблицу refresh токенов
 	CREATE TABLE IF NOT EXISTS refresh_tokens (
 		id SERIAL PRIMARY KEY,
 		user_email VARCHAR(255) UNIQUE NOT NULL,
@@ -69,7 +75,7 @@ func InitTables(pool *pgxpool.Pool) error {
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 
-	-- 5. Создаем таблицу с платежами
+	-- 6. Создаем таблицу с платежами
 	CREATE TABLE IF NOT EXISTS payments (
 		id SERIAL PRIMARY KEY,
 		user_email TEXT NOT NULL REFERENCES users(email), 
