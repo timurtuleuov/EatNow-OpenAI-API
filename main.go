@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"openai/db"
 	handlers "openai/handlers"
+
+	// models "openai/models"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -219,6 +221,10 @@ func main() {
 			}
 
 			start := time.Now()
+			// Сделаю тестовый возврат готового рецепта чтобы
+			// recipe := models.MockRecipes()[0]
+			// time.Sleep(time.Duration(20) * time.Second)
+			// TODO: не забудь раскомментить
 			recipe, err := handlers.GetRecipeByPrompt(body.Prompt)
 			if err != nil {
 				log.Println("❌ Recipe generation error:", err)
