@@ -78,6 +78,47 @@ Generate complete cooking recipes in STRICT JSON format only.
   "source": ""
 }
 `
+var systemPromptDetectOp = `
+Ты — системный классификатор. Твоя единственная задача — определить тип операции на основе сообщения пользователя.
+
+### ТИПЫ ОПЕРАЦИЙ:
+- GENERATE: запрос на создание рецепта из текста или списка продуктов.
+- RECIPE_PHOTO: если есть изображение и нужно распознать блюдо/продукты для рецепта.
+- CALORIES: вопрос о калориях, БЖУ или диетической ценности (текст или фото).
+- CONSULT: приветствия, общие вопросы о кулинарии, советы, вопросы "что ты умеешь".
+
+### ПРАВИЛА:
+1. Отвечай ТОЛЬКО одним словом из списка выше.
+2. Не используй кавычки, точки или пояснения.
+3. Если сомневаешься между GENERATE и CONSULT, выбирай CONSULT.
+4. Если прислано фото без текста, выбирай RECIPE_PHOTO.
+
+ОТВЕТЬ ОДНИМ СЛОВОМ В ВЕРХНЕМ РЕГИСТРЕ.
+`
+
+var systemPromptConsult = `
+Ты — профессиональный шеф-повар и эксперт по питанию в приложении What2Eat. 
+Твоя задача — консультировать пользователя, отвечать на кулинарные вопросы и помогать с выбором продуктов.
+
+### ТВОИ ВОЗМОЖНОСТИ:
+1. Ответы на вопросы о техниках готовки (как жарить, варить, запекать).
+2. Советы по замене ингредиентов (чем заменить яйца, сливки и т.д.).
+3. Помощь в планировании рациона и общие советы по здоровому питанию.
+4. Вежливое общение и ответы на приветствия.
+
+### ПРАВИЛА ОТВЕТА:
+- Ты должен отвечать ТОЛЬКО в формате JSON.
+- Тон общения: профессиональный, но теплый и вдохновляющий.
+- Если пользователь спрашивает что-то не по теме еды, вежливо верни его к кулинарии.
+- Используй Markdown внутри текстового поля для выделения важных моментов (жирный шрифт, списки).
+
+### СТРУКТУРА JSON:
+{
+  "message": "Твой основной текст ответа с использованием Markdown",
+  "suggestions": ["Вариант вопроса 1", "Вариант вопроса 2"], // 2-3 коротких варианта, что пользователь может спросить следующим
+  "tip": "Короткий лайфхак от шефа по теме вопроса" // необязательно, может быть пустой строкой
+}
+`
 
 // 🍳 GetRecipeByPrompt — основная функция, обращается к GPT и возвращает структуру рецепта.
 func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
@@ -125,7 +166,7 @@ func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
 }
 
 // тип операции консультация
-func Consult(prompt string) (*string, error) {
+func Consult(prompt string) (*model.Consult, error) {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
@@ -136,7 +177,43 @@ func Consult(prompt string) (*string, error) {
 	params := openai.ChatCompletionNewParams{
 		Model: "gpt-4o-mini",
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(systemPrompt),
+			openai.SystemMessage(systemPromptConsult),
+			openai.UserMessage(prompt),
+		},
+		MaxCompletionTokens: openai.Int(2000),
+	}
+
+	resp, err := client.Chat.Completions.New(context.Background(), params)
+	if err != nil {
+		return nil, fmt.Errorf("OpenAI request failed: %w", err)
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+		return nil, fmt.Errorf("модель не сгенерировала контент (пустой ответ)")
+	}
+
+	raw := resp.Choices[0].Message.Content
+
+	var consult model.Consult
+	if err := json.Unmarshal([]byte(raw), &consult); err != nil {
+		return nil, fmt.Errorf("JSON parse error: %w\nRaw output:\n%s", err, raw)
+	}
+
+	return &consult, nil
+}
+
+func DetectAIOperation(prompt string) (*string, error) {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
+	}
+
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+
+	params := openai.ChatCompletionNewParams{
+		Model: "gpt-4o-mini",
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage(systemPromptDetectOp),
 			openai.UserMessage(prompt),
 		},
 		MaxCompletionTokens: openai.Int(2000),
