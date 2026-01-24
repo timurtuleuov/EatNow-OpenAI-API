@@ -224,31 +224,48 @@ func main() {
 			// Сделаю тестовый возврат готового рецепта чтобы
 			// recipe := models.MockRecipes()[0]
 			// time.Sleep(time.Duration(20) * time.Second)
-			// TODO: не забудь раскомментить
-			recipe, err := handlers.GetRecipeByPrompt(body.Prompt)
-			if err != nil {
-				log.Println("❌ Recipe generation error:", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-				return
+			// TODO: не забудь
+			operation, err := handlers.DetectAIOperation(body.Prompt)
+			if operation != nil {
+				println("ОПЕРАЦИЯ:", *operation) // Печатает "GENERATE"
 			}
 
-			duration := time.Since(start).Milliseconds()
+			if operation != nil && *operation == "GENERATE" {
+				recipe, err := handlers.GetRecipeByPrompt(body.Prompt)
+				if err != nil {
+					log.Println("❌ Recipe generation error:", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
 
-			log := handlers.PromptLog{
-				DeviceID:   body.DeviceID,
-				Prompt:     body.Prompt,
-				Response:   recipe,
-				Model:      "gpt-4o-mini",
-				DurationMs: int(duration),
-				Success:    err == nil,
-				ErrorMsg:   fmt.Sprintf("%v", err),
-				AppVersion: "1.0.0",
-				Language:   "ru",
-				Country:    "KZ",
+				duration := time.Since(start).Milliseconds()
+
+				log := handlers.PromptLog{
+					DeviceID:   body.DeviceID,
+					Prompt:     body.Prompt,
+					Response:   recipe,
+					Model:      "gpt-4o-mini",
+					DurationMs: int(duration),
+					Success:    err == nil,
+					ErrorMsg:   fmt.Sprintf("%v", err),
+					AppVersion: "1.1.0",
+					Language:   "ru",
+					Country:    "KZ",
+				}
+				_ = handlers.LogPrompt(pool, log)
+
+				c.JSON(http.StatusOK, recipe)
+			} else if operation != nil && *operation == "CONSULT" {
+				consult, err := handlers.Consult(body.Prompt)
+				if err != nil {
+					log.Println("❌ Consult generation error:", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+
+				c.JSON(http.StatusOK, consult)
 			}
-			_ = handlers.LogPrompt(pool, log)
 
-			c.JSON(http.StatusOK, recipe)
 		})
 
 		protected.POST("/recipe/get-free", func(c *gin.Context) {
