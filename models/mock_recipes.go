@@ -3,7 +3,6 @@ package model
 func MockRecipes() []Recipe {
 	return []Recipe{
 		{
-			ID:               1,
 			Title:            "Спагетти Карбонара",
 			Description:      ptr("Классическая итальянская паста с яйцами, сыром, беконом и перцем."),
 			Servings:         2,
@@ -28,7 +27,6 @@ func MockRecipes() []Recipe {
 			Nutrition: map[string]interface{}{"калории": 520, "белки": "22г"},
 		},
 		{
-			ID:               2,
 			Title:            "Куриное карри",
 			Description:      ptr("Пряное карри с курицей и кокосовым молоком в индийском стиле."),
 			Servings:         4,
@@ -52,7 +50,7 @@ func MockRecipes() []Recipe {
 			Source:   ptr("remote"),
 		},
 		{
-			ID:               3,
+
 			Title:            "Авокадо-тост",
 			Description:      ptr("Быстрый и полезный завтрак с авокадо и яйцом."),
 			Servings:         1,

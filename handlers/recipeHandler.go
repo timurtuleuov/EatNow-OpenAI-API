@@ -20,7 +20,6 @@ Generate complete cooking recipes in STRICT JSON format only.
 
 ### JSON SCHEMA:
 {
-  "id": 1,
   "title": "string",
   "description": "string (optional)",
   "servings": 2,
@@ -122,10 +121,37 @@ func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
 		return nil, fmt.Errorf("JSON parse error: %w\nRaw output:\n%s", err, raw)
 	}
 
-	// 8️⃣ Подстраховка
-	if recipe.ID == 0 {
-		recipe.ID = 1
+	return &recipe, nil
+}
+
+// тип операции консультация
+func Consult(prompt string) (*string, error) {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
 
-	return &recipe, nil
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+
+	params := openai.ChatCompletionNewParams{
+		Model: "gpt-4o-mini",
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage(systemPrompt),
+			openai.UserMessage(prompt),
+		},
+		MaxCompletionTokens: openai.Int(2000),
+	}
+
+	resp, err := client.Chat.Completions.New(context.Background(), params)
+	if err != nil {
+		return nil, fmt.Errorf("OpenAI request failed: %w", err)
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+		return nil, fmt.Errorf("модель не сгенерировала контент (пустой ответ)")
+	}
+
+	answer := resp.Choices[0].Message.Content
+
+	return &answer, nil
 }
