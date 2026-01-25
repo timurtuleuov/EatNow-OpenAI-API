@@ -254,7 +254,9 @@ func main() {
 				}
 				_ = handlers.LogPrompt(pool, log)
 
-				c.JSON(http.StatusOK, recipe)
+				c.JSON(http.StatusOK, gin.H{
+					"operation": operation, "data": recipe,
+				})
 			} else if operation != nil && *operation == "CONSULT" {
 				consult, err := handlers.Consult(body.Prompt)
 				if err != nil {
@@ -263,7 +265,9 @@ func main() {
 					return
 				}
 
-				c.JSON(http.StatusOK, consult)
+				c.JSON(http.StatusOK, gin.H{
+					"operation": operation, "data": consult,
+				})
 			}
 
 		})
