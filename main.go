@@ -194,6 +194,7 @@ func main() {
 			var body struct {
 				DeviceID string `json:"device_id"`
 				Prompt   string `json:"prompt"`
+				Image    string `json:"image"`
 			}
 
 			if err := c.ShouldBindJSON(&body); err != nil {
@@ -225,13 +226,16 @@ func main() {
 			// recipe := models.MockRecipes()[0]
 			// time.Sleep(time.Duration(20) * time.Second)
 			// TODO: не забудь
-			operation, err := handlers.DetectAIOperation(body.Prompt)
+			hasImage := body.Image != ""
+			operation, err := handlers.DetectAIOperation(body.Prompt, hasImage)
 			if operation != nil {
 				println("ОПЕРАЦИЯ:", *operation) // Печатает "GENERATE"
+
 			}
 
 			if operation != nil && *operation == "GENERATE" {
 				recipe, err := handlers.GetRecipeByPrompt(body.Prompt)
+				println("ТЕЛО:", recipe)
 				if err != nil {
 					log.Println("❌ Recipe generation error:", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -259,6 +263,7 @@ func main() {
 				})
 			} else if operation != nil && *operation == "CONSULT" {
 				consult, err := handlers.Consult(body.Prompt)
+				println("ТЕЛО:", consult)
 				if err != nil {
 					log.Println("❌ Consult generation error:", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -267,6 +272,46 @@ func main() {
 
 				c.JSON(http.StatusOK, gin.H{
 					"operation": operation, "data": consult,
+				})
+			} else if operation != nil && *operation == "CALORIES" {
+				calories, err := handlers.Calories(body.Prompt, body.Image)
+				println("ТЕЛО:", calories)
+				if err != nil {
+					log.Println("❌ Consult generation error:", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+
+				c.JSON(http.StatusOK, gin.H{
+					"operation": operation, "data": calories,
+				})
+			} else if operation != nil && *operation == "RECIPE_PHOTO" {
+				recipe, err := handlers.GetRecipeFromPhoto(body.Prompt, body.Image)
+				println("ТЕЛО:", recipe)
+				if err != nil {
+					log.Println("❌ Recipe generation error:", err)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+
+				duration := time.Since(start).Milliseconds()
+
+				log := handlers.PromptLog{
+					DeviceID:   body.DeviceID,
+					Prompt:     body.Prompt,
+					Response:   recipe,
+					Model:      "gpt-4o-mini",
+					DurationMs: int(duration),
+					Success:    err == nil,
+					ErrorMsg:   fmt.Sprintf("%v", err),
+					AppVersion: "1.1.0",
+					Language:   "ru",
+					Country:    "KZ",
+				}
+				_ = handlers.LogPrompt(pool, log)
+
+				c.JSON(http.StatusOK, gin.H{
+					"operation": operation, "data": recipe,
 				})
 			}
 

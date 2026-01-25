@@ -1,6 +1,7 @@
 package model
 
 type Recipe struct {
+	ID               int                    `json:"id"`
 	Title            string                 `json:"title"`
 	Description      *string                `json:"description,omitempty"`
 	Servings         int                    `json:"servings"`

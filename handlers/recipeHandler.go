@@ -117,14 +117,112 @@ var systemPromptConsult = `
 - Ты должен отвечать ТОЛЬКО в формате JSON.
 - Тон общения: профессиональный, но теплый и вдохновляющий.
 - Если пользователь спрашивает что-то не по теме еды, вежливо верни его к кулинарии.
-- Используй Markdown внутри текстового поля для выделения важных моментов (жирный шрифт, списки).
 
 ### СТРУКТУРА JSON:
 {
-  "text": "Твой основной текст ответа с использованием Markdown",
+  "text": "Твой основной текст ответа",
   "suggestions": ["Вариант вопроса 1", "Вариант вопроса 2"], // 2-3 коротких варианта, что пользователь может спросить следующим
   "tip": "Короткий лайфхак от шефа по теме вопроса" // необязательно, может быть пустой строкой
 }
+`
+
+var systemPromptDetectOpWithImage = `
+Ты — кулинарный диспетчер. Пользователь прислал ФОТО.
+Определи, что он хочет сделать с этим изображением:
+
+1. RECIPE_PHOTO: Если он хочет узнать, что это за блюдо, получить его рецепт или список ингредиентов с фото. (Приоритет по умолчанию).
+2. CALORIES: Если он спрашивает про вес, калорийность, БЖУ, диету или "можно ли мне это съесть" (если он на диете).
+
+Ответь строго одним словом в верхнем регистре.
+`
+
+var systemPromptCalories = `
+You are a professional nutritionist and calorie estimation expert.
+Your goal is to analyze the food (from text description or image) and provide an estimated nutritional breakdown.
+
+### JSON SCHEMA:
+{
+  "food_name": "string (name of the dish/product)",
+  "estimated_weight_g": 250,
+  "calories": 450,
+  "protein": 20,
+  "fat": 15,
+  "carbs": 55,
+  "analysis": "string (brief explanation of how you calculated this)",
+  "health_rating": 1-10,
+  "suggestions": ["Add more greens", "High sodium warning"],
+  "is_safe_to_eat": true
+}
+
+### CRITICAL RULES:
+1. Output ONLY raw JSON.
+2. If an image is provided, estimate portions based on visual cues. 
+3. If only text is provided (e.g., "1 banana"), use standard USDA database averages.
+4. Use English field names, but ALL content (values) MUST be in the user's language.
+5. NUMBERS: calories, protein, fat, carbs, weight must be integers or floats (no strings like "10g").
+6. ACCURACY: Provide realistic estimates. If you don't know the exact weight, use a standard serving size.
+
+### EXAMPLE OUTPUT (User asked in Russian: "Сколько калорий в порции плова?"):
+{
+  {
+	"food_name": "Плов с говядиной",
+	"estimated_weight_g": 300,
+	"calories": 650,
+	"protein": 25.5,
+	"fat": 32.0,
+	"carbs": 68.4,
+	"analysis": "Оценка основана на анализе порции: виден рис, куски говядины и умеренное количество масла.",
+	"health_rating": 7,
+	"suggestions": [
+		"Добавьте овощной салат для клетчатки",
+		"Порция содержит много жиров"
+		]
+	}
+}
+`
+
+var systemPromptRecipeFromPhoto = `
+You are a professional chef with computer vision capabilities. 
+Analyze the provided image and generate a complete cooking recipe in STRICT JSON format.
+
+### VISION TASKS:
+1. Identify all visible ingredients or the finished dish in the photo.
+2. If it is a finished dish, provide the authentic recipe for it.
+3. If it is a set of raw ingredients, create the most logical recipe using them.
+
+### JSON SCHEMA (MUST match the standard recipe structure):
+{
+  "title": "string",
+  "description": "string (what you identified in the photo)",
+  "servings": 2,
+  "total_time_minutes": 30,
+  "difficulty": "easy|medium|hard",
+  "ingredients": [
+    {
+      "id": "1", "name": "string", "quantity": 100, "unit": "string", 
+      "prepared": "string (optional)", "optional": false
+    }
+  ],
+  "steps": [
+    {
+      "order": 1, "description": "string", 
+      "duration_seconds": 60, "ingredients_used": ["1"]
+    }
+  ],
+  "nutrition": {
+    "calories": 250, "protein": "10g", "fat": "5g", "carbs": "40g"
+  },
+  "tags": ["photo-recognized", "tag2"],
+  "image_url": "",
+  "source": "AI Visual Recognition"
+}
+
+### CRITICAL RULES:
+1. Output ONLY raw JSON - no explanations or markdown code blocks.
+2. Content (values) MUST be in the user's language (Russian), but keys remain English.
+3. Be specific: If you see a specific brand or type of vegetable, include that detail.
+4. If the photo is not food-related, return an error-like JSON with a title "Not Food" and an empty ingredients list.
+5. Minimum 4 steps for the recipe.
 `
 
 // 🍳 GetRecipeByPrompt — основная функция, обращается к GPT и возвращает структуру рецепта.
@@ -209,20 +307,31 @@ func Consult(prompt string) (*model.Consult, error) {
 	return &consult, nil
 }
 
-func DetectAIOperation(prompt string) (*string, error) {
+// рецепт с фото
+func GetRecipeFromPhoto(prompt, base64Image string) (*model.Recipe, error) {
 	apiKey := os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
-
+	imageUrl := fmt.Sprintf("data:image/jpeg;base64,%s", base64Image)
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 
 	params := openai.ChatCompletionNewParams{
 		Model: "gpt-4o-mini",
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(systemPromptDetectOp),
-			openai.UserMessage(prompt),
+
+			openai.SystemMessage(systemPromptRecipeFromPhoto),
+			openai.UserMessage(
+				[]openai.ChatCompletionContentPartUnionParam{
+					openai.TextContentPart(prompt),
+					openai.ImageContentPart(
+						openai.ChatCompletionContentPartImageImageURLParam{
+							URL: imageUrl,
+						}),
+				},
+			),
 		},
+
 		MaxCompletionTokens: openai.Int(2000),
 	}
 
@@ -235,7 +344,114 @@ func DetectAIOperation(prompt string) (*string, error) {
 		return nil, fmt.Errorf("модель не сгенерировала контент (пустой ответ)")
 	}
 
-	answer := resp.Choices[0].Message.Content
+	raw := resp.Choices[0].Message.Content
 
-	return &answer, nil
+	var recipe model.Recipe
+	if err := json.Unmarshal([]byte(raw), &recipe); err != nil {
+		return nil, fmt.Errorf("JSON parse error: %w\nRaw output:\n%s", err, raw)
+	}
+
+	return &recipe, nil
+}
+
+// рецепт с фото
+func Calories(prompt, base64Image string) (*model.Calories, error) {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
+	}
+	imageUrl := fmt.Sprintf("data:image/jpeg;base64,%s", base64Image)
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+
+	params := openai.ChatCompletionNewParams{
+		Model: "gpt-4o-mini",
+		Messages: []openai.ChatCompletionMessageParamUnion{
+
+			openai.SystemMessage(systemPromptCalories),
+			openai.UserMessage(
+				[]openai.ChatCompletionContentPartUnionParam{
+					openai.TextContentPart(prompt),
+					openai.ImageContentPart(
+						openai.ChatCompletionContentPartImageImageURLParam{
+							URL: imageUrl,
+						}),
+				},
+			),
+		},
+
+		MaxCompletionTokens: openai.Int(2000),
+	}
+
+	resp, err := client.Chat.Completions.New(context.Background(), params)
+	if err != nil {
+		return nil, fmt.Errorf("OpenAI request failed: %w", err)
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+		return nil, fmt.Errorf("модель не сгенерировала контент (пустой ответ)")
+	}
+
+	raw := resp.Choices[0].Message.Content
+
+	var calorie model.Calories
+	if err := json.Unmarshal([]byte(raw), &calorie); err != nil {
+		return nil, fmt.Errorf("JSON parse error: %w\nRaw output:\n%s", err, raw)
+	}
+
+	return &calorie, nil
+}
+
+func DetectAIOperation(prompt string, hasImage bool) (*string, error) {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
+	}
+
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+	if !hasImage {
+		params := openai.ChatCompletionNewParams{
+			Model: "gpt-4o-mini",
+			Messages: []openai.ChatCompletionMessageParamUnion{
+				openai.SystemMessage(systemPromptDetectOp),
+				openai.UserMessage(prompt),
+			},
+			MaxCompletionTokens: openai.Int(2000),
+		}
+
+		resp, err := client.Chat.Completions.New(context.Background(), params)
+		if err != nil {
+			return nil, fmt.Errorf("OpenAI request failed: %w", err)
+		}
+
+		if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+			return nil, fmt.Errorf("модель не сгенерировала контент (пустой ответ)")
+		}
+
+		answer := resp.Choices[0].Message.Content
+
+		return &answer, nil
+	} else {
+		params := openai.ChatCompletionNewParams{
+			Model: "gpt-4o-mini",
+			Messages: []openai.ChatCompletionMessageParamUnion{
+				openai.SystemMessage(systemPromptDetectOpWithImage),
+				openai.UserMessage(prompt),
+			},
+			MaxCompletionTokens: openai.Int(2000),
+		}
+
+		resp, err := client.Chat.Completions.New(context.Background(), params)
+		if err != nil {
+			return nil, fmt.Errorf("OpenAI request failed: %w", err)
+		}
+
+		if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+			return nil, fmt.Errorf("модель не сгенерировала контент (пустой ответ)")
+		}
+
+		answer := resp.Choices[0].Message.Content
+
+		return &answer, nil
+
+	}
 }
