@@ -7,7 +7,6 @@ import (
 	"openai/db"
 	handlers "openai/handlers"
 
-	// models "openai/models"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -285,7 +284,7 @@ func main() {
 				c.JSON(http.StatusOK, gin.H{
 					"operation": operation, "data": calories,
 				})
-			} else if operation != nil && *operation == "RECIPE_PHOTO" {
+			} else if operation != nil && *operation == "RECIPE_PHOTO" && hasImage {
 				recipe, err := handlers.GetRecipeFromPhoto(body.Prompt, body.Image)
 				println("ТЕЛО:", recipe)
 				if err != nil {
