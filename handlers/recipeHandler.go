@@ -12,11 +12,9 @@ import (
 	"github.com/openai/openai-go/option"
 )
 
-var apiKey = os.Getenv("OPENAI_API_KEY")
-
 // 🍳 GetRecipeByPrompt — основная функция, обращается к GPT и возвращает структуру рецепта.
 func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
-
+	var apiKey = os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
@@ -54,7 +52,7 @@ func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
 
 // тип операции консультация
 func Consult(prompt string) (*model.Consult, error) {
-
+	var apiKey = os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
@@ -91,7 +89,7 @@ func Consult(prompt string) (*model.Consult, error) {
 
 // рецепт с фото
 func GetRecipeFromPhoto(prompt, base64Image string) (*model.Recipe, error) {
-
+	var apiKey = os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
@@ -138,7 +136,7 @@ func GetRecipeFromPhoto(prompt, base64Image string) (*model.Recipe, error) {
 
 // рецепт с фото
 func Calories(prompt, base64Image string) (*model.Calories, error) {
-
+	var apiKey = os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
@@ -188,7 +186,7 @@ func Calories(prompt, base64Image string) (*model.Calories, error) {
 
 // Определение AI операции. Варианты: GENERATE, CALORIES, RECIPE_PHOTO, CONSULT
 func DetectAIOperation(prompt string, hasImage bool) (*string, error) {
-
+	var apiKey = os.Getenv("OPENAI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
