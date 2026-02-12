@@ -92,6 +92,7 @@ func main() {
 				})
 			}
 		})
+
 		auth.POST("/login", func(c *gin.Context) {
 			var body struct {
 				Email    string `json:"email"`
@@ -103,9 +104,9 @@ func main() {
 				return
 			}
 
-			log.Printf("🚀 Попытка входа:")
-			log.Printf("   Email: [%s]", body.Email)
-			log.Printf("   Password length: %d", len(body.Password)) // Пароли лучше не логировать целиком
+			// log.Printf("🚀 Попытка входа:")
+			// log.Printf("   Email: [%s]", body.Email)
+			// log.Printf("   Password length: %d", len(body.Password)) // Пароли лучше не логировать целиком
 
 			ok, err := handlers.CheckUserExistsAndAuth(pool, body.Email, body.Password)
 			if err != nil {
@@ -178,6 +179,7 @@ func main() {
 		c.Next()
 	})
 	protected := router.Group("/api")
+
 	protected.Use(handlers.AuthMiddleware())
 	{
 		protected.GET("/home", func(c *gin.Context) {
@@ -228,13 +230,12 @@ func main() {
 			hasImage := body.Image != ""
 			operation, err := handlers.DetectAIOperation(body.Prompt, hasImage)
 			if operation != nil {
-				println("ОПЕРАЦИЯ:", *operation) // Печатает "GENERATE"
-
+				println("ОПЕРАЦИЯ:", *operation)
 			}
 
 			if operation != nil && *operation == "GENERATE" {
 				recipe, err := handlers.GetRecipeByPrompt(body.Prompt)
-				println("ТЕЛО:", recipe)
+				// println("ТЕЛО:", recipe)
 				if err != nil {
 					log.Println("❌ Recipe generation error:", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -262,7 +263,7 @@ func main() {
 				})
 			} else if operation != nil && *operation == "CONSULT" {
 				consult, err := handlers.Consult(body.Prompt)
-				println("ТЕЛО:", consult)
+				// println("ТЕЛО:", consult)
 				if err != nil {
 					log.Println("❌ Consult generation error:", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -274,7 +275,7 @@ func main() {
 				})
 			} else if operation != nil && *operation == "CALORIES" {
 				calories, err := handlers.Calories(body.Prompt, body.Image)
-				println("ТЕЛО:", calories)
+				// println("ТЕЛО:", calories)
 				if err != nil {
 					log.Println("❌ Consult generation error:", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -286,7 +287,7 @@ func main() {
 				})
 			} else if operation != nil && *operation == "RECIPE_PHOTO" && hasImage {
 				recipe, err := handlers.GetRecipeFromPhoto(body.Prompt, body.Image)
-				println("ТЕЛО:", recipe)
+				// println("ТЕЛО:", recipe)
 				if err != nil {
 					log.Println("❌ Recipe generation error:", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -319,13 +320,11 @@ func main() {
 		protected.POST("/recipe/get-free", func(c *gin.Context) {
 			userEmail, _ := c.Get("email")
 
-			// Проверка, что device_id и prompt не пустые
 			if userEmail.(string) == "" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "missing device_id or prompt"})
 				return
 			}
 
-			//bonus works 7 days
 			if err := handlers.GrantBonus(pool, userEmail.(string), "reward_ad", 168*time.Hour); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
