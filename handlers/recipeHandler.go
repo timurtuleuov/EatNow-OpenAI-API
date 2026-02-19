@@ -10,6 +10,8 @@ import (
 
 	openai "github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
+
+	"github.com/spf13/viper"
 )
 
 // 🍳 GetRecipeByPrompt — основная функция, обращается к GPT и возвращает структуру рецепта.
@@ -52,7 +54,7 @@ func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
 
 // тип операции консультация
 func Consult(prompt string) (*model.Consult, error) {
-	var apiKey = os.Getenv("OPENAI_API_KEY")
+	var apiKey = viper.GetString("openai.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
@@ -62,7 +64,7 @@ func Consult(prompt string) (*model.Consult, error) {
 	params := openai.ChatCompletionNewParams{
 		Model: "gpt-4o-mini",
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(systemPromptConsult),
+			openai.SystemMessage(viper.GetString("prompts.consult")),
 			openai.UserMessage(prompt),
 		},
 		MaxCompletionTokens: openai.Int(2000),

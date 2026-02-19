@@ -7,9 +7,10 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/spf13/viper"
 )
 
-var jwtKey = []byte("dsajdasdhasbdhasdyuashyudashdasnnduiashdyuasdhiasudhasoiu") // В продакшене используйте environment variables!
+var jwtKey = []byte(viper.GetString("server.jwt_key")) // В продакшене используйте environment variables!
 
 type Claims struct {
 	Email string `json:"email"`

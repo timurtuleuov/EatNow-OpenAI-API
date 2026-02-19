@@ -11,14 +11,33 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
+
+	// "github.com/joho/godotenv"
+	"github.com/spf13/viper"
 )
 
-func main() {
+func InitConfig() {
+	viper.SetConfigName("config.default")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
 
-	if err := godotenv.Load("dependencies.env"); err != nil {
-		log.Printf("Не удалось загрузить .env: %v", err)
+	if err := viper.ReadInConfig(); err != nil {
+		log.Fatalf("Ошибка чтения конфига %s", err)
 	}
+
+	viper.SetConfigName("config.local")
+
+	err := viper.MergeInConfig()
+	if err != nil {
+		log.Fatalf("Ошибка мерджа конфиглв %s", err)
+	}
+}
+
+func main() {
+	InitConfig()
+	// if err := godotenv.Load("dependencies.env"); err != nil {
+	// 	log.Printf("Не удалось загрузить .env: %v", err)
+	// }
 
 	pool, err := db.Connect()
 	if err != nil {
