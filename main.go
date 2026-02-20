@@ -13,24 +13,65 @@ import (
 	"github.com/gin-gonic/gin"
 
 	// "github.com/joho/godotenv"
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 )
 
 func InitConfig() {
-	viper.SetConfigName("config.default")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
+	// 1. Указываем файлы жестко, чтобы не путаться в именах
+	defaultFile := "config.default.yaml"
+	localFile := "config.local.yaml"
 
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Ошибка чтения конфига %s", err)
+	// Функция для загрузки (слоеный пирог)
+	load := func() {
+		viper.SetConfigFile(defaultFile)
+		if err := viper.ReadInConfig(); err != nil {
+			log.Printf("Ошибка дефолта: %v", err)
+		}
+
+		// Накладываем локальный
+		viper.SetConfigFile(localFile)
+		if err := viper.MergeInConfig(); err != nil {
+			// Не страшно, если локального нет
+		}
+		fmt.Println("✅ Конфиг успешно обновлен в памяти")
 	}
 
-	viper.SetConfigName("config.local")
+	// 2. Первый запуск
+	load()
 
-	err := viper.MergeInConfig()
+	// 3. Создаем СВОЙ наблюдатель (Watcher)
+	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatalf("Ошибка мерджа конфиглв %s", err)
+		log.Fatal(err)
 	}
+	// Мы не закрываем его (defer), так как он должен жить всё время работы сервера
+
+	// 4. Добавляем файлы в список слежки
+	watcher.Add(defaultFile)
+	watcher.Add(localFile)
+
+	// 5. Запускаем фоновый процесс обработки событий
+	go func() {
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				// Проверяем, было ли это изменение (Write)
+				if event.Op&fsnotify.Write == fsnotify.Write {
+					fmt.Printf("изменение в файле: %s\n", event.Name)
+					load() // Перезагружаем данные в Viper
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Println("ошибка watcher:", err)
+			}
+		}
+	}()
 }
 
 func main() {

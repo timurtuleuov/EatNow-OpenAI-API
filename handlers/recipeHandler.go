@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 
 	model "openai/models"
 
@@ -16,7 +15,7 @@ import (
 
 // 🍳 GetRecipeByPrompt — основная функция, обращается к GPT и возвращает структуру рецепта.
 func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
-	var apiKey = os.Getenv("OPENAI_API_KEY")
+	var apiKey = viper.GetString("openai.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
@@ -24,9 +23,9 @@ func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 
 	params := openai.ChatCompletionNewParams{
-		Model: "gpt-4o-mini",
+		Model: viper.GetString("openai.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(systemPrompt),
+			openai.SystemMessage(viper.GetString("prompts.generate_recipe")),
 			openai.UserMessage(prompt),
 		},
 		MaxCompletionTokens: openai.Int(2000),
@@ -62,7 +61,7 @@ func Consult(prompt string) (*model.Consult, error) {
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 
 	params := openai.ChatCompletionNewParams{
-		Model: "gpt-4o-mini",
+		Model: viper.GetString("openai.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage(viper.GetString("prompts.consult")),
 			openai.UserMessage(prompt),
@@ -91,7 +90,7 @@ func Consult(prompt string) (*model.Consult, error) {
 
 // рецепт с фото
 func GetRecipeFromPhoto(prompt, base64Image string) (*model.Recipe, error) {
-	var apiKey = os.Getenv("OPENAI_API_KEY")
+	var apiKey = viper.GetString("openai.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
@@ -99,10 +98,10 @@ func GetRecipeFromPhoto(prompt, base64Image string) (*model.Recipe, error) {
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 
 	params := openai.ChatCompletionNewParams{
-		Model: "gpt-4o-mini",
+		Model: viper.GetString("openai.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 
-			openai.SystemMessage(systemPromptRecipeFromPhoto),
+			openai.SystemMessage(viper.GetString("prompts.recipe_from_photo")),
 			openai.UserMessage(
 				[]openai.ChatCompletionContentPartUnionParam{
 					openai.TextContentPart(prompt),
@@ -138,7 +137,7 @@ func GetRecipeFromPhoto(prompt, base64Image string) (*model.Recipe, error) {
 
 // рецепт с фото
 func Calories(prompt, base64Image string) (*model.Calories, error) {
-	var apiKey = os.Getenv("OPENAI_API_KEY")
+	var apiKey = viper.GetString("openai.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
@@ -147,10 +146,10 @@ func Calories(prompt, base64Image string) (*model.Calories, error) {
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 
 	params := openai.ChatCompletionNewParams{
-		Model: "gpt-4o-mini",
+		Model: viper.GetString("openai.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 
-			openai.SystemMessage(systemPromptCalories),
+			openai.SystemMessage(viper.GetString("prompts.calories_estimation")),
 			openai.UserMessage(
 				[]openai.ChatCompletionContentPartUnionParam{
 					openai.TextContentPart(prompt),
@@ -188,7 +187,7 @@ func Calories(prompt, base64Image string) (*model.Calories, error) {
 
 // Определение AI операции. Варианты: GENERATE, CALORIES, RECIPE_PHOTO, CONSULT
 func DetectAIOperation(prompt string, hasImage bool) (*string, error) {
-	var apiKey = os.Getenv("OPENAI_API_KEY")
+	var apiKey = viper.GetString("openai.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
 	}
@@ -196,9 +195,9 @@ func DetectAIOperation(prompt string, hasImage bool) (*string, error) {
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 	if !hasImage {
 		params := openai.ChatCompletionNewParams{
-			Model: "gpt-4o-mini",
+			Model: viper.GetString("openai.model"),
 			Messages: []openai.ChatCompletionMessageParamUnion{
-				openai.SystemMessage(systemPromptDetectOp),
+				openai.SystemMessage(viper.GetString("prompts.detect_operation")),
 				openai.UserMessage(prompt),
 			},
 			MaxCompletionTokens: openai.Int(2000),
@@ -218,9 +217,9 @@ func DetectAIOperation(prompt string, hasImage bool) (*string, error) {
 		return &answer, nil
 	} else {
 		params := openai.ChatCompletionNewParams{
-			Model: "gpt-4o-mini",
+			Model: viper.GetString("openai.model"),
 			Messages: []openai.ChatCompletionMessageParamUnion{
-				openai.SystemMessage(systemPromptDetectOpWithImage),
+				openai.SystemMessage(viper.GetString("prompts.detect_operation_image")),
 				openai.UserMessage(prompt),
 			},
 			MaxCompletionTokens: openai.Int(2000),
