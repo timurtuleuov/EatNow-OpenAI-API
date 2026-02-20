@@ -5,9 +5,10 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/spf13/viper"
 )
 
-const FreeDailyLimit = 5
+var FreeDailyLimit = viper.GetInt("server.free_daily_limit")
 
 func CanUsePrompt(db *pgxpool.Pool, email string) (bool, error) {
 	var isPremium bool
