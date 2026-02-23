@@ -8,8 +8,6 @@ import (
 	"github.com/spf13/viper"
 )
 
-var FreeDailyLimit = viper.GetInt("server.free_daily_limit")
-
 func CanUsePrompt(db *pgxpool.Pool, email string) (bool, error) {
 	var isPremium bool
 	var premiumExpires, lastPromptDate *time.Time
@@ -47,7 +45,7 @@ func CanUsePrompt(db *pgxpool.Pool, email string) (bool, error) {
 		`, email, now)
 		return true, err
 	}
-
+	FreeDailyLimit := viper.GetInt("server.free_daily_limit")
 	// 🚫 Превышен лимит — проверяем бонус
 	if used >= FreeDailyLimit {
 		var bonusID string

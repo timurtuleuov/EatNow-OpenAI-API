@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"openai/db"
 	handlers "openai/handlers"
+	"os"
 
 	"time"
 
@@ -16,6 +18,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 )
+
+var APP_VERSION = "1.2.0"
 
 func InitConfig() {
 	// 1. Указываем файлы жестко, чтобы не путаться в именах
@@ -80,17 +84,20 @@ func main() {
 	// 	log.Printf("Не удалось загрузить .env: %v", err)
 	// }
 
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	slog.SetDefault(logger)
+
 	pool, err := db.Connect()
 	if err != nil {
-		log.Fatalf("DB connection error: %v", err)
+		logger.Error("DB connection error", "message", err, "version", APP_VERSION)
 	}
 	defer pool.Close()
 
 	if err := db.InitTables(pool); err != nil {
-		log.Fatalf("Failed to initialize users table: %v", err)
+		logger.Error("Failed to initialize users table", "message", err, "version", APP_VERSION)
 	}
-
-	log.Println("Succesfully connected to the DB")
+	logger.Info("Succesfully connected to the DB", "version", APP_VERSION)
 
 	router := gin.Default()
 	router.Use(cors.New(cors.Config{
@@ -251,6 +258,7 @@ func main() {
 
 		protected.POST("/recipe", func(c *gin.Context) {
 			userEmail, _ := c.Get("email")
+			email := userEmail.(string)
 
 			var body struct {
 				DeviceID string `json:"device_id"`
@@ -258,26 +266,42 @@ func main() {
 				Image    string `json:"image"`
 			}
 
+			logger.Info("new_recipe_request",
+				"user_email", email,
+				"has_image", body.Image != "",
+				"version", APP_VERSION,
+			)
+
 			if err := c.ShouldBindJSON(&body); err != nil {
-				log.Println("❌ JSON bind error:", err)
+				logger.Error("request_parse_failed",
+					"error", err,
+					"user_email", email,
+				)
 				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 				return
 			}
 
 			if body.Prompt == "" {
-				log.Printf("❌ Missing fields: prompt='%s'\n", body.Prompt)
+				logger.Warn("validation_failed",
+					"reason", "empty_prompt",
+					"user_email", email,
+				)
 				c.JSON(http.StatusBadRequest, gin.H{"error": "missing device_id or prompt"})
 				return
 			}
 
 			allowed, err := handlers.CanUsePrompt(pool, userEmail.(string))
 			if err != nil {
-				log.Println("❌ DB error in CanUsePrompt:", err)
+				logger.Error("db_error_check_limits",
+					"error", err,
+					"user_email", email,
+				)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 				return
 			}
 			if !allowed {
-				log.Println("❌ Daily limit reached for", userEmail.(string))
+
+				logger.Warn("limit_reached", "user_email", email)
 				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
 				return
 			}
@@ -287,13 +311,22 @@ func main() {
 			// recipe := models.MockRecipes()[0]
 			// time.Sleep(time.Duration(20) * time.Second)
 			// TODO: не забудь
+			opName := "unknown"
+
 			hasImage := body.Image != ""
 			operation, err := handlers.DetectAIOperation(body.Prompt, hasImage)
+
 			if operation != nil {
-				println("ОПЕРАЦИЯ:", *operation)
+				opName = *operation
 			}
 
-			if operation != nil && *operation == "GENERATE" {
+			logger.Info("ai_operation_detected",
+				"operation", opName,
+				"user_email", email,
+			)
+
+			switch opName {
+			case "GENERATE":
 				recipe, err := handlers.GetRecipeByPrompt(body.Prompt)
 				// println("ТЕЛО:", recipe)
 				if err != nil {
@@ -302,26 +335,24 @@ func main() {
 					return
 				}
 
-				duration := time.Since(start).Milliseconds()
-
-				log := handlers.PromptLog{
-					DeviceID:   body.DeviceID,
-					Prompt:     body.Prompt,
-					Response:   recipe,
-					Model:      "gpt-4o-mini",
-					DurationMs: int(duration),
-					Success:    err == nil,
-					ErrorMsg:   fmt.Sprintf("%v", err),
-					AppVersion: "1.1.0",
-					Language:   "ru",
-					Country:    "KZ",
-				}
-				_ = handlers.LogPrompt(pool, log)
+				// log := handlers.PromptLog{
+				// 	DeviceID:   body.DeviceID,
+				// 	Prompt:     body.Prompt,
+				// 	Response:   recipe,
+				// 	Model:      "gpt-4o-mini",
+				// 	DurationMs: int(duration),
+				// 	Success:    err == nil,
+				// 	ErrorMsg:   fmt.Sprintf("%v", err),
+				// 	AppVersion: "1.1.0",
+				// 	Language:   "ru",
+				// 	Country:    "KZ",
+				// }
+				// _ = handlers.LogPrompt(pool, log)
 
 				c.JSON(http.StatusOK, gin.H{
 					"operation": operation, "data": recipe,
 				})
-			} else if operation != nil && *operation == "CONSULT" {
+			case "CONSULT":
 				consult, err := handlers.Consult(body.Prompt)
 				// println("ТЕЛО:", consult)
 				if err != nil {
@@ -333,7 +364,7 @@ func main() {
 				c.JSON(http.StatusOK, gin.H{
 					"operation": operation, "data": consult,
 				})
-			} else if operation != nil && *operation == "CALORIES" {
+			case "CALORIES":
 				calories, err := handlers.Calories(body.Prompt, body.Image)
 				// println("ТЕЛО:", calories)
 				if err != nil {
@@ -345,7 +376,7 @@ func main() {
 				c.JSON(http.StatusOK, gin.H{
 					"operation": operation, "data": calories,
 				})
-			} else if operation != nil && *operation == "RECIPE_PHOTO" && hasImage {
+			case "RECIPE_PHOTO":
 				recipe, err := handlers.GetRecipeFromPhoto(body.Prompt, body.Image)
 				// println("ТЕЛО:", recipe)
 				if err != nil {
@@ -354,27 +385,45 @@ func main() {
 					return
 				}
 
-				duration := time.Since(start).Milliseconds()
-
-				log := handlers.PromptLog{
-					DeviceID:   body.DeviceID,
-					Prompt:     body.Prompt,
-					Response:   recipe,
-					Model:      "gpt-4o-mini",
-					DurationMs: int(duration),
-					Success:    err == nil,
-					ErrorMsg:   fmt.Sprintf("%v", err),
-					AppVersion: "1.1.0",
-					Language:   "ru",
-					Country:    "KZ",
-				}
-				_ = handlers.LogPrompt(pool, log)
+				// log := handlers.PromptLog{
+				// 	DeviceID:   body.DeviceID,
+				// 	Prompt:     body.Prompt,
+				// 	Response:   recipe,
+				// 	Model:      "gpt-4o-mini",
+				// 	DurationMs: int(duration),
+				// 	Success:    err == nil,
+				// 	ErrorMsg:   fmt.Sprintf("%v", err),
+				// 	AppVersion: "1.1.0",
+				// 	Language:   "ru",
+				// 	Country:    "KZ",
+				// }
+				// _ = handlers.LogPrompt(pool, log)
 
 				c.JSON(http.StatusOK, gin.H{
 					"operation": operation, "data": recipe,
 				})
 			}
 
+			duration := time.Since(start).Milliseconds()
+			if err != nil {
+				// 3. Логируем ошибку генерации с контекстом
+				logger.Error("ai_generation_failed",
+					"operation", opName,
+					"error", err,
+					"duration_ms", duration,
+					"user_email", email,
+				)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to process ai request"})
+				return
+			}
+
+			logger.Info("recipe_processed_success",
+				"operation", opName,
+				"duration_ms", duration,
+				"user_email", email,
+				"device_id", body.DeviceID,
+				"country", "KZ",
+			)
 		})
 
 		protected.POST("/recipe/get-free", func(c *gin.Context) {
