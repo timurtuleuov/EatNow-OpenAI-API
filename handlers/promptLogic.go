@@ -48,32 +48,33 @@ func CanUsePrompt(db *pgxpool.Pool, email string) (bool, error) {
 	FreeDailyLimit := viper.GetInt("server.free_daily_limit")
 	// 🚫 Превышен лимит — проверяем бонус
 	if used >= FreeDailyLimit {
-		var bonusID string
+		var bonusID int // У тебя в схеме SERIAL, это int
 		err := db.QueryRow(context.Background(), `
-			SELECT id FROM user_bonuses
-			WHERE email = $1
-			  AND status = 'active'
-			  AND (expires_at IS NULL OR expires_at > NOW())
-			ORDER BY issued_at ASC
+			SELECT b.id FROM user_bonuses b
+			JOIN users u ON b.user_id = u.id
+			WHERE u.email = $1 
+			AND b.status = 'active'
+			AND (b.expires_at IS NULL OR b.expires_at > NOW())
+			ORDER BY b.issued_at ASC
 			LIMIT 1
 		`, email).Scan(&bonusID)
 
-		if err == nil && bonusID != "" {
+		if err == nil {
 			// 🪙 Используем бонус
 			_, err := db.Exec(context.Background(), `
-				UPDATE user_bonuses
-				SET status = 'used', used_at = NOW()
-				WHERE id = $1
+				UPDATE user_bonuses SET status = 'used', used_at = NOW() WHERE id = $1
 			`, bonusID)
 			if err != nil {
 				return false, err
 			}
-
-			// 💥 Не трогаем счётчик, просто разрешаем промпт
 			return true, nil
 		}
 
-		// ❌ Нет бонуса — лимит исчерпан
+		// Если ошибка не "строка не найдена", значит это реальная проблема с БД
+		if err != nil && err.Error() != "no rows in result set" {
+			return false, err
+		}
+
 		return false, nil
 	}
 

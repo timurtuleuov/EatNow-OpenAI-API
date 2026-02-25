@@ -5,11 +5,14 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/spf13/viper"
 )
 
 // дать использование промпта
 func GetFreePrompt(db *pgxpool.Pool, email string) (bool, error) {
 	var used int
+	FreeDailyLimit := viper.GetInt("server.free_daily_limit")
+
 	err := db.QueryRow(context.Background(), `
 		SELECT daily_used_prompts FROM users WHERE email=$1
 	`, email).Scan(&used)
@@ -19,7 +22,7 @@ func GetFreePrompt(db *pgxpool.Pool, email string) (bool, error) {
 	}
 
 	// Если еще есть промпты — бонус не нужен
-	if used < 5 {
+	if used < FreeDailyLimit {
 		return false, nil
 	}
 
@@ -38,9 +41,10 @@ func GetFreePrompt(db *pgxpool.Pool, email string) (bool, error) {
 // выдать бонус
 func GrantBonus(db *pgxpool.Pool, email, bonusType string, expiresIn time.Duration) error {
 	_, err := db.Exec(context.Background(), `
-		INSERT INTO user_bonuses (email, type, status, expires_at)
-		VALUES ($1, $2, 'active', NOW() + $3 * INTERVAL '1 second')
-	`, email, bonusType, int(expiresIn.Seconds()))
+        INSERT INTO user_bonuses (user_id, device_id, type, status, expires_at)
+        SELECT id, device_id, $2, 'active', NOW() + $3 * INTERVAL '1 second'
+        FROM users WHERE email = $1
+    `, email, bonusType, int(expiresIn.Seconds()))
 	return err
 }
 
@@ -50,15 +54,14 @@ func UseBonus(db *pgxpool.Pool, email string) (bool, error) {
         UPDATE user_bonuses
         SET status = 'used', used_at = NOW()
         WHERE id = (
-            SELECT id FROM user_bonuses
-            WHERE email = $1 AND status = 'active'
-              AND (expires_at IS NULL OR expires_at > NOW())
-            ORDER BY issued_at ASC
+            SELECT b.id FROM user_bonuses b
+            JOIN users u ON b.user_id = u.id
+            WHERE u.email = $1 AND b.status = 'active'
+              AND (b.expires_at IS NULL OR b.expires_at > NOW())
+            ORDER BY b.issued_at ASC
             LIMIT 1
-			FOR UPDATE SKIP LOCKED
+            FOR UPDATE SKIP LOCKED
         )
     `, email)
-
-	// true если бонус реально был найден и использован
 	return cmdTag.RowsAffected() > 0, err
 }

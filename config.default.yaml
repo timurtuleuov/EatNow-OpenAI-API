@@ -1,14 +1,14 @@
 server:
   port: 8080
-  free_daily_limit: 5
+  free_daily_limit: 10
   
 
 database:
-  user: "postgres" # Сюда подставь значения из .env
-  password: ""     # Если используешь Docker, лучше оставить пустые строки здесь
-  host: "db"       # Имя сервиса в docker-compose
+  user: "core" 
+  password: "12345678"    
+  host: "db"       
   port: 5432
-  name: "eatnow_db"
+  name: "eatnow"
 
 # Секция системных промптоввыфвфывыф
 prompts:
