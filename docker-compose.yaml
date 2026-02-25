@@ -3,8 +3,6 @@ version: "3.9"
 services:
   app:
     build: .
-    env_file:
-    - dependencies.env
     container_name: eatnow_app
     logging:
       driver: "json-file"

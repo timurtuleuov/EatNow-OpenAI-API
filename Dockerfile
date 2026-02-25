@@ -7,13 +7,14 @@ RUN go mod download
 
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o server .
-COPY config.default.yaml . 
-COPY config.local.yaml . 
+
 # Этап запуска
 FROM alpine:latest
 
 WORKDIR /app
 COPY --from=builder /app/server .
+COPY --from=builder /app/config.default.yaml .
+COPY --from=builder /app/config.local.yaml .
 
 # Можно задать переменные окружения (если хочешь)
 ENV PORT=8080
