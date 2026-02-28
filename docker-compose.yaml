@@ -9,6 +9,8 @@ services:
       options:
         max-size: "10m"
     restart: always
+    volumes:
+      - ./configs:/app/configs
     ports:
       - "8080:8080"
     environment:

@@ -1,6 +1,7 @@
 server:
   port: 8080
-  free_daily_limit: 10
+  is_prod: false
+  free_daily_limit: 5
   
 
 database:

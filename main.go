@@ -23,8 +23,8 @@ var APP_VERSION = "1.2.0"
 
 func InitConfig() {
 	// 1. Указываем файлы жестко, чтобы не путаться в именах
-	defaultFile := "config.default.yaml"
-	localFile := "config.local.yaml"
+	defaultFile := "configs/config.default.yaml"
+	localFile := "configs/config.local.yaml"
 
 	// Функция для загрузки (слоеный пирог)
 	load := func() {
@@ -50,10 +50,9 @@ func InitConfig() {
 		log.Fatal(err)
 	}
 	// Мы не закрываем его (defer), так как он должен жить всё время работы сервера
-
-	// 4. Добавляем файлы в список слежки
-	watcher.Add(defaultFile)
-	watcher.Add(localFile)
+	if err := watcher.Add("./configs"); err != nil {
+		log.Printf("Ошибка watcher.Add: %v", err)
+	}
 
 	// 5. Запускаем фоновый процесс обработки событий
 	go func() {
