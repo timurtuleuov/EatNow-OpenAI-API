@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"openai/db"
 	handlers "openai/handlers"
+	model "openai/models"
 	"os"
 
 	"time"
@@ -260,9 +261,10 @@ func main() {
 			email := userEmail.(string)
 
 			var body struct {
-				DeviceID string `json:"device_id"`
-				Prompt   string `json:"prompt"`
-				Image    string `json:"image"`
+				DeviceID string          `json:"device_id"`
+				Prompt   string          `json:"prompt"`
+				History  []model.Message `json:"history"`
+				Image    string          `json:"image"`
 			}
 
 			logger.Info("new_recipe_request",
@@ -313,20 +315,27 @@ func main() {
 			opName := "unknown"
 
 			hasImage := body.Image != ""
-			operation, err := handlers.DetectAIOperation(body.Prompt, hasImage)
+			opName, refinedPrompt, err := handlers.DetectAIOperation(body.Prompt, body.History, hasImage, body.Image)
 
-			if operation != nil {
-				opName = *operation
+			if err != nil {
+				logger.Error("ai_operation_detection_failed",
+					"error", err,
+					"user_email", email,
+				)
+				// Если детектор упал, по умолчанию считаем это обычной консультацией или генерацией
+				opName = "CONSULT"
+				refinedPrompt = body.Prompt
 			}
 
 			logger.Info("ai_operation_detected",
 				"operation", opName,
+				"refined_prompt", refinedPrompt,
 				"user_email", email,
 			)
 
 			switch opName {
 			case "GENERATE":
-				recipe, err := handlers.GetRecipeByPrompt(body.Prompt)
+				recipe, err := handlers.GetRecipeByPrompt(refinedPrompt)
 				// println("ТЕЛО:", recipe)
 				if err != nil {
 					log.Println("❌ Recipe generation error:", err)
@@ -349,10 +358,10 @@ func main() {
 				// _ = handlers.LogPrompt(pool, log)
 
 				c.JSON(http.StatusOK, gin.H{
-					"operation": operation, "data": recipe,
+					"operation": opName, "data": recipe,
 				})
 			case "CONSULT":
-				consult, err := handlers.Consult(body.Prompt)
+				consult, err := handlers.Consult(refinedPrompt)
 				// println("ТЕЛО:", consult)
 				if err != nil {
 					log.Println("❌ Consult generation error:", err)
@@ -361,10 +370,10 @@ func main() {
 				}
 
 				c.JSON(http.StatusOK, gin.H{
-					"operation": operation, "data": consult,
+					"operation": opName, "data": consult,
 				})
 			case "CALORIES":
-				calories, err := handlers.Calories(body.Prompt, body.Image)
+				calories, err := handlers.Calories(refinedPrompt, body.Image)
 				// println("ТЕЛО:", calories)
 				if err != nil {
 					log.Println("❌ Consult generation error:", err)
@@ -373,10 +382,10 @@ func main() {
 				}
 
 				c.JSON(http.StatusOK, gin.H{
-					"operation": operation, "data": calories,
+					"operation": opName, "data": calories,
 				})
 			case "RECIPE_PHOTO":
-				recipe, err := handlers.GetRecipeFromPhoto(body.Prompt, body.Image)
+				recipe, err := handlers.GetRecipeFromPhoto(refinedPrompt, body.Image)
 				// println("ТЕЛО:", recipe)
 				if err != nil {
 					log.Println("❌ Recipe generation error:", err)
@@ -399,8 +408,13 @@ func main() {
 				// _ = handlers.LogPrompt(pool, log)
 
 				c.JSON(http.StatusOK, gin.H{
-					"operation": operation, "data": recipe,
+					"operation": opName, "data": recipe,
 				})
+
+			default:
+				// Если ИИ выдал что-то странное, просто консультируем
+				consult, _ := handlers.Consult(refinedPrompt)
+				c.JSON(http.StatusOK, gin.H{"operation": "CONSULT", "data": consult})
 			}
 
 			duration := time.Since(start).Milliseconds()
