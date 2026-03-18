@@ -336,6 +336,9 @@ func main() {
 			switch opName {
 			case "GENERATE":
 				recipe, err := handlers.GetRecipeByPrompt(refinedPrompt)
+				imgURL, err := handlers.GenerateImage("Сделай картинку блюда по рецепту:" + refinedPrompt)
+				handlers.SaveImage(imgURL)
+
 				// println("ТЕЛО:", recipe)
 				if err != nil {
 					log.Println("❌ Recipe generation error:", err)

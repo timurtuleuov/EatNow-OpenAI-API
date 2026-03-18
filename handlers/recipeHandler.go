@@ -2,9 +2,14 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"github.com/google/uuid"
 
 	model "openai/models"
 
@@ -260,4 +265,52 @@ func DetectAIOperation(prompt string, history []model.Message, hasImage bool, ba
 	}
 
 	return operation, refinedPrompt, nil
+}
+
+func GenerateImage(prompt string) (string, error) {
+	apiKey := viper.GetString("openai.api_key")
+	if apiKey == "" {
+		return "", fmt.Errorf("OPENAI_API_KEY not set")
+	}
+
+	client := openai.NewClient(option.WithAPIKey(apiKey))
+
+	resp, err := client.Images.Generate(context.TODO(), openai.ImageGenerateParams{
+		Model:   "gpt-image-1",
+		Prompt:  prompt,
+		Size:    openai.ImageGenerateParamsSize1024x1024,
+		Quality: openai.ImageGenerateParamsQualityLow,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	// 👉 GPT модель возвращает base64
+	b64 := resp.Data[0].B64JSON
+
+	return b64, nil
+}
+
+func SaveImage(base64Str string) error {
+	// путь до папки
+	dir := "./images"
+
+	// создаём папку, если её нет
+	err := os.MkdirAll(dir, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	filename := uuid.New().String() + ".png"
+
+	// полный путь к файлу
+	filePath := filepath.Join(dir, filename)
+
+	// декод base64
+	data, err := base64.StdEncoding.DecodeString(base64Str)
+	if err != nil {
+		return err
+	}
+
+	// сохраняем файл
+	return os.WriteFile(filePath, data, 0644)
 }
