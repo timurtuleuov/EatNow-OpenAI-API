@@ -7,6 +7,8 @@
 dependencies.env
 *.env
 
+images
+
 # API keys and secrets
 key.txt
 *.key

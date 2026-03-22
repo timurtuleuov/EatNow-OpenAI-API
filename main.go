@@ -100,6 +100,7 @@ func main() {
 	logger.Info("Succesfully connected to the DB", "version", APP_VERSION)
 
 	router := gin.Default()
+
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"}, // Для теста, потом замени на свой домен
 		AllowMethods:     []string{"POST", "GET", "OPTIONS", "PUT", "DELETE"},
@@ -107,6 +108,9 @@ func main() {
 		ExposeHeaders:    []string{"Content-Length"},
 		AllowCredentials: true,
 	}))
+
+	router.Static("/images", "./images")
+
 	auth := router.Group("/auth")
 	{
 		auth.POST("/register", func(c *gin.Context) {
@@ -336,8 +340,32 @@ func main() {
 			switch opName {
 			case "GENERATE":
 				recipe, err := handlers.GetRecipeByPrompt(refinedPrompt)
-				imgURL, err := handlers.GenerateImage("Сделай картинку блюда по рецепту:" + refinedPrompt)
-				handlers.SaveImage(imgURL)
+				isPremium := handlers.UserIsPremium(pool, email)
+				logger.Info("premium_check", "email", email, "is_premium", isPremium)
+
+				if isPremium {
+					imgURL, err := handlers.GenerateImage("Сделай картинку блюда по рецепту, без надписей:" + refinedPrompt)
+
+					if err != nil {
+						logger.Error("image_generation_failed",
+							"error", err,
+							"user_email", email,
+						)
+					} else {
+						logger.Info("image_generation_success",
+							"user_email", email,
+						)
+					}
+					fileName, err := handlers.SaveImage(imgURL)
+					logger.Info("save_image",
+						"fileName", fileName,
+						"user_email", email,
+					)
+					if err == nil {
+						recipe.ImageURL = &fileName
+					}
+
+				}
 
 				// println("ТЕЛО:", recipe)
 				if err != nil {

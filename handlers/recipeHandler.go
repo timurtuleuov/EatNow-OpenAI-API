@@ -291,26 +291,30 @@ func GenerateImage(prompt string) (string, error) {
 	return b64, nil
 }
 
-func SaveImage(base64Str string) error {
-	// путь до папки
+func SaveImage(base64Str string) (string, error) {
 	dir := "./images"
 
-	// создаём папку, если её нет
 	err := os.MkdirAll(dir, os.ModePerm)
 	if err != nil {
-		return err
+		return "", err
 	}
+
+	// Генерируем чистое имя файла
 	filename := uuid.New().String() + ".png"
 
-	// полный путь к файлу
+	// Полный путь используем ТОЛЬКО для записи на диск
 	filePath := filepath.Join(dir, filename)
 
-	// декод base64
 	data, err := base64.StdEncoding.DecodeString(base64Str)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	// сохраняем файл
-	return os.WriteFile(filePath, data, 0644)
+	// Сохраняем по полному пути, но возвращаем только filename
+	err = os.WriteFile(filePath, data, 0644)
+	if err != nil {
+		return "", err
+	}
+
+	return filename, nil // <-- Возвращаем только имя "uuid.png"
 }

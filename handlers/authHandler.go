@@ -188,3 +188,17 @@ func GetMe(db *pgxpool.Pool) gin.HandlerFunc {
 		})
 	}
 }
+
+func UserIsPremium(db *pgxpool.Pool, email string) bool {
+
+	var isPremium bool
+
+	err := db.QueryRow(context.Background(),
+		"SELECT is_premium FROM users WHERE email = $1",
+		email).Scan(&isPremium)
+
+	if err != nil {
+		return false
+	}
+	return isPremium
+}
