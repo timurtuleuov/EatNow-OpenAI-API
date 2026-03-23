@@ -10,6 +10,7 @@ services:
         max-size: "10m"
     restart: always
     volumes:
+      - ./images:/app/images
       - ./configs:/app/configs
     ports:
       - "8080:8080"

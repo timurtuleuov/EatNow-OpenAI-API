@@ -17,6 +17,7 @@ WORKDIR /app
 
 # 1. Копируем бинарник из билдера
 COPY --from=builder /app/server .
+COPY images ./images
 
 # 2. Создаем папку configs
 RUN mkdir configs

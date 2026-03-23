@@ -276,10 +276,10 @@ func GenerateImage(prompt string) (string, error) {
 	client := openai.NewClient(option.WithAPIKey(apiKey))
 
 	resp, err := client.Images.Generate(context.TODO(), openai.ImageGenerateParams{
-		Model:   "gpt-image-1",
+		Model:   "gpt-image-1.5",
 		Prompt:  prompt,
 		Size:    openai.ImageGenerateParamsSize1024x1024,
-		Quality: openai.ImageGenerateParamsQualityLow,
+		Quality: openai.ImageGenerateParamsQualityMedium,
 	})
 	if err != nil {
 		return "", err

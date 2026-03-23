@@ -84,6 +84,12 @@ func main() {
 	// 	log.Printf("Не удалось загрузить .env: %v", err)
 	// }
 
+	// ctx := context.Background()
+	// imgGen, err := handlers.NewImageGenerator(ctx)
+	// if err != nil {
+	// 	log.Fatalf("Ошибка инициализации Gemini: %v", err)
+	// }
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	slog.SetDefault(logger)
@@ -345,6 +351,7 @@ func main() {
 
 				if isPremium {
 					imgURL, err := handlers.GenerateImage("Сделай картинку блюда по рецепту, без надписей:" + refinedPrompt)
+					// imgURL, err := imgGen.GenerateGeminiImage(ctx, "Сделай картинку блюда по рецепту, без надписей:"+refinedPrompt)
 
 					if err != nil {
 						logger.Error("image_generation_failed",
