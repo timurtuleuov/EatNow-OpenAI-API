@@ -271,10 +271,11 @@ func main() {
 			email := userEmail.(string)
 
 			var body struct {
-				DeviceID string          `json:"device_id"`
-				Prompt   string          `json:"prompt"`
-				History  []model.Message `json:"history"`
-				Image    string          `json:"image"`
+				DeviceID   string          `json:"device_id"`
+				Prompt     string          `json:"prompt"`
+				History    []model.Message `json:"history"`
+				Image      string          `json:"image"`
+				IsBrainrot bool            `json:"is_brainrot"`
 			}
 
 			logger.Info("new_recipe_request",
@@ -350,7 +351,20 @@ func main() {
 				logger.Info("premium_check", "email", email, "is_premium", isPremium)
 
 				if isPremium {
-					imgURL, err := handlers.GenerateImage("Сделай картинку блюда по рецепту, без надписей:" + refinedPrompt)
+
+					imagePrompt := "Сделай картинку блюда по рецепту, без надписей: " + refinedPrompt
+
+					// Если включен экспериментальный режим brainrot
+					if body.IsBrainrot {
+						// Добавляем модификаторы промпта для генерации визуального безумия
+						imagePrompt += ", brainrot style, aesthetic of internet memes, skibidi toilet elements, gigachad features, ohio vibes, surreal high quality funny visuals"
+
+						logger.Info("brainrot_generation_triggered",
+							"user_email", email,
+							"operation", "GENERATE_IMAGE",
+						)
+					}
+					imgURL, err := handlers.GenerateImage(imagePrompt)
 					// imgURL, err := imgGen.GenerateGeminiImage(ctx, "Сделай картинку блюда по рецепту, без надписей:"+refinedPrompt)
 
 					if err != nil {
