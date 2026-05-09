@@ -107,6 +107,8 @@ func main() {
 
 	router := gin.Default()
 
+	tavilyKey := viper.GetString("tavily_key")
+
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     []string{"*"}, // Для теста, потом замени на свой домен
 		AllowMethods:     []string{"POST", "GET", "OPTIONS", "PUT", "DELETE"},
@@ -346,6 +348,23 @@ func main() {
 
 			switch opName {
 			case "GENERATE":
+
+				tavilyData, err := handlers.SearchTavily(tavilyKey, body.Prompt, body.IsBrainrot)
+				if err != nil {
+					logger.Error("tavily_error", "err", err)
+				} else if len(tavilyData.Results) > 0 {
+					// Добавляем найденную инфу в промпт для нейронки
+					contextInfo := "\nНайденная информация в интернете:\n"
+					for _, res := range tavilyData.Results {
+						contextInfo += fmt.Sprintf("- %s: %s\n", res.Title, res.Content)
+					}
+
+					// Склеиваем оригинальный промпт с контекстом из Tavily
+					refinedPrompt = refinedPrompt + contextInfo
+
+					logger.Info("tavily_context_added", "results", len(tavilyData.Results))
+				}
+
 				recipe, err := handlers.GetRecipeByPrompt(refinedPrompt)
 				isPremium := handlers.UserIsPremium(pool, email)
 				logger.Info("premium_check", "email", email, "is_premium", isPremium)
@@ -413,6 +432,21 @@ func main() {
 					"operation": opName, "data": recipe,
 				})
 			case "CONSULT":
+				tavilyData, err := handlers.SearchTavily(tavilyKey, body.Prompt, body.IsBrainrot)
+				if err != nil {
+					logger.Error("tavily_error", "err", err)
+				} else if len(tavilyData.Results) > 0 {
+					// Добавляем найденную инфу в промпт для нейронки
+					contextInfo := "\nНайденная информация в интернете:\n"
+					for _, res := range tavilyData.Results {
+						contextInfo += fmt.Sprintf("- %s: %s\n", res.Title, res.Content)
+					}
+
+					// Склеиваем оригинальный промпт с контекстом из Tavily
+					refinedPrompt = refinedPrompt + contextInfo
+
+					logger.Info("tavily_context_added", "results", len(tavilyData.Results))
+				}
 				consult, err := handlers.Consult(refinedPrompt)
 				// println("ТЕЛО:", consult)
 				if err != nil {
@@ -425,6 +459,22 @@ func main() {
 					"operation": opName, "data": consult,
 				})
 			case "CALORIES":
+				tavilyData, err := handlers.SearchTavily(tavilyKey, body.Prompt, body.IsBrainrot)
+				if err != nil {
+					logger.Error("tavily_error", "err", err)
+				} else if len(tavilyData.Results) > 0 {
+					// Добавляем найденную инфу в промпт для нейронки
+					contextInfo := "\nНайденная информация в интернете:\n"
+					for _, res := range tavilyData.Results {
+						contextInfo += fmt.Sprintf("- %s: %s\n", res.Title, res.Content)
+					}
+
+					// Склеиваем оригинальный промпт с контекстом из Tavily
+					refinedPrompt = refinedPrompt + contextInfo
+
+					logger.Info("tavily_context_added", "results", len(tavilyData.Results))
+				}
+
 				calories, err := handlers.Calories(refinedPrompt, body.Image)
 				// println("ТЕЛО:", calories)
 				if err != nil {
@@ -437,6 +487,7 @@ func main() {
 					"operation": opName, "data": calories,
 				})
 			case "RECIPE_PHOTO":
+
 				recipe, err := handlers.GetRecipeFromPhoto(refinedPrompt, body.Image)
 				// println("ТЕЛО:", recipe)
 				if err != nil {
