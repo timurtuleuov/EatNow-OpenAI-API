@@ -380,7 +380,7 @@ func main() {
 					// Если включен экспериментальный режим brainrot
 					if body.IsBrainrot {
 						// Добавляем модификаторы промпта для генерации визуального безумия
-						imagePrompt += ", brainrot style, aesthetic of internet memes, skibidi toilet elements, gigachad features, ohio vibes, surreal high quality funny visuals"
+						imagePrompt += viper.GetString("prompts.brainrot_image_prompt")
 
 						logger.Info("brainrot_generation_triggered",
 							"user_email", email,
@@ -561,6 +561,138 @@ func main() {
 		{
 			payments.POST("/verify-google", handlers.VerifyGooglePurchase(pool))
 		}
+
+		protected.POST("/meal-plan", func(c *gin.Context) {
+			userEmail, _ := c.Get("email")
+			email := userEmail.(string)
+
+			var body struct {
+				Prompt     string          `json:"prompt"`
+				History    []model.Message `json:"history"`
+				IsBrainrot bool            `json:"is_brainrot"`
+			}
+
+			if err := c.ShouldBindJSON(&body); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+				return
+			}
+
+			if body.Prompt == "" {
+				body.Prompt = "Составь план питания на неделю"
+			}
+
+			allowed, err := handlers.CanUsePrompt(pool, email)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+				return
+			}
+			if !allowed {
+				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
+				return
+			}
+
+			refinedPrompt := body.Prompt
+			if enableTavily {
+				refinedPrompt = enrichWithTavily(tavilyKey, body.Prompt, body.IsBrainrot)
+			}
+
+			mealPlan, err := handlers.GenerateMealPlan(refinedPrompt)
+			if err != nil {
+				logger.Error("meal_plan_generation_failed", "error", err, "user_email", email)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			logger.Info("meal_plan_generated", "user_email", email, "days", len(mealPlan.Days))
+			c.JSON(http.StatusOK, gin.H{"operation": "MEAL_PLAN", "data": mealPlan})
+		})
+
+		favorites := protected.Group("/favorites")
+		{
+			favorites.POST("", handlers.AddToFavorites(pool))
+			favorites.GET("", handlers.GetFavorites(pool))
+			favorites.DELETE("/:id", handlers.RemoveFavorite(pool))
+		}
+
+		protected.POST("/substitute", func(c *gin.Context) {
+			userEmail, _ := c.Get("email")
+			email := userEmail.(string)
+
+			var body struct {
+				Ingredient string `json:"ingredient"`
+				Reason     string `json:"reason"`
+			}
+
+			if err := c.ShouldBindJSON(&body); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+				return
+			}
+
+			if body.Ingredient == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "missing ingredient"})
+				return
+			}
+
+			allowed, err := handlers.CanUsePrompt(pool, email)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+				return
+			}
+			if !allowed {
+				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
+				return
+			}
+
+			result, err := handlers.GetSubstitutes(body.Ingredient, body.Reason)
+			if err != nil {
+				logger.Error("substitute_failed", "error", err, "user_email", email)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			logger.Info("substitute_generated", "user_email", email, "ingredient", body.Ingredient)
+			c.JSON(http.StatusOK, gin.H{"operation": "SUBSTITUTE", "data": result})
+		})
+
+		protected.POST("/what-to-cook", func(c *gin.Context) {
+			userEmail, _ := c.Get("email")
+			email := userEmail.(string)
+
+			var body struct {
+				Ingredients []string `json:"ingredients"`
+				Preferences string   `json:"preferences"`
+			}
+
+			if err := c.ShouldBindJSON(&body); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+				return
+			}
+
+			if len(body.Ingredients) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "missing ingredients"})
+				return
+			}
+
+			allowed, err := handlers.CanUsePrompt(pool, email)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+				return
+			}
+			if !allowed {
+				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
+				return
+			}
+
+			result, err := handlers.WhatToCook(body.Ingredients, body.Preferences)
+			if err != nil {
+				logger.Error("what_to_cook_failed", "error", err, "user_email", email)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			logger.Info("what_to_cook_generated", "user_email", email, "ingredients_count", len(body.Ingredients))
+			c.JSON(http.StatusOK, gin.H{"operation": "WHAT_TO_COOK", "data": result})
+		})
 
 	}
 

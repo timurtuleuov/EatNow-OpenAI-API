@@ -75,7 +75,15 @@ func InitTables(pool *pgxpool.Pool) error {
 		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 	);
 
-	-- 6. Создаем таблицу с платежами
+	-- 6. Создаем таблицу избранных рецептов
+	CREATE TABLE IF NOT EXISTS favorites (
+		id SERIAL PRIMARY KEY,
+		user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+		recipe JSONB NOT NULL,
+		created_at TIMESTAMPTZ DEFAULT NOW()
+	);
+
+	-- 7. Создаем таблицу с платежами
 	CREATE TABLE IF NOT EXISTS payments (
 		id SERIAL PRIMARY KEY,
 		user_email TEXT NOT NULL REFERENCES users(email), 
