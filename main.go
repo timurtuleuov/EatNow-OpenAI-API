@@ -694,6 +694,45 @@ func main() {
 			c.JSON(http.StatusOK, gin.H{"operation": "WHAT_TO_COOK", "data": result})
 		})
 
+		protected.POST("/nutrition-log", func(c *gin.Context) {
+			userEmail, _ := c.Get("email")
+			email := userEmail.(string)
+
+			var body struct {
+				Meals []string `json:"meals"`
+			}
+
+			if err := c.ShouldBindJSON(&body); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+				return
+			}
+
+			if len(body.Meals) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "missing meals"})
+				return
+			}
+
+			allowed, err := handlers.CanUsePrompt(pool, email)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
+				return
+			}
+			if !allowed {
+				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
+				return
+			}
+
+			result, err := handlers.AnalyzeNutritionLog(body.Meals)
+			if err != nil {
+				logger.Error("nutrition_log_failed", "error", err, "user_email", email)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+
+			logger.Info("nutrition_log_analyzed", "user_email", email, "meals", len(body.Meals))
+			c.JSON(http.StatusOK, gin.H{"operation": "NUTRITION_LOG", "data": result})
+		})
+
 	}
 
 	router.Run(":8080")
