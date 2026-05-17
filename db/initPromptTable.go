@@ -28,12 +28,17 @@ func InitTables(pool *pgxpool.Pool) error {
 		created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
 		updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 	);
-
+	ALTER TABLE recipes ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id) ON DELETE CASCADE;
+	ALTER TABLE recipes ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT NOW();
 	-- 2. Отдельная таблица для рецептов
 	CREATE TABLE IF NOT EXISTS recipes (
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	recipe JSONB
+	user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+	recipe JSONB,
+	created_at TIMESTAMPTZ DEFAULT NOW()
 	);
+
+	
 
 	-- 3. Создаём таблицу логов (prompts)
 	CREATE TABLE IF NOT EXISTS prompts (
@@ -79,9 +84,15 @@ func InitTables(pool *pgxpool.Pool) error {
 	CREATE TABLE IF NOT EXISTS favorites (
 		id SERIAL PRIMARY KEY,
 		user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-		recipe JSONB NOT NULL,
-		created_at TIMESTAMPTZ DEFAULT NOW()
+		recipe_id UUID REFERENCES recipes(id) ON DELETE CASCADE, 
+		created_at TIMESTAMPTZ DEFAULT NOW(),
+		CONSTRAINT unique_user_recipe UNIQUE (user_id, recipe_id)
 	);
+
+	-- Миграция для существующей таблицы favorites (была колонка recipe JSONB, стала recipe_id UUID)
+	ALTER TABLE favorites ADD COLUMN IF NOT EXISTS recipe_id UUID REFERENCES recipes(id) ON DELETE CASCADE;
+	ALTER TABLE favorites DROP CONSTRAINT IF EXISTS unique_user_recipe;
+	ALTER TABLE favorites ADD CONSTRAINT unique_user_recipe UNIQUE (user_id, recipe_id);
 
 	-- 7. Создаем таблицу с платежами
 	CREATE TABLE IF NOT EXISTS payments (

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -16,17 +18,19 @@ func AddToFavorites(db *pgxpool.Pool) gin.HandlerFunc {
 		userEmail, _ := c.Get("email")
 		email := userEmail.(string)
 
+		// 🟢 ИСПРАВЛЕНО: Теперь ждем строку (UUID), а не int
 		var body struct {
-			Recipe model.Recipe `json:"recipe"`
+			RecipeID string `json:"recipe_id" binding:"required"`
 		}
 		if err := c.ShouldBindJSON(&body); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON, recipe_id (string UUID) is required"})
 			return
 		}
 
+		// Получаем UUID пользователя по email
 		var userID string
 		err := db.QueryRow(context.Background(),
-			"SELECT id FROM users WHERE email = $1", email,
+			"SELECT id::text FROM users WHERE email = $1", email,
 		).Scan(&userID)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
@@ -35,10 +39,16 @@ func AddToFavorites(db *pgxpool.Pool) gin.HandlerFunc {
 
 		var favID int
 		err = db.QueryRow(context.Background(),
-			`INSERT INTO favorites (user_id, recipe) VALUES ($1, $2) RETURNING id`,
-			userID, body.Recipe,
+			`INSERT INTO favorites (user_id, recipe_id) 
+             VALUES ($1::uuid, $2::uuid) 
+             ON CONFLICT (user_id, recipe_id) DO UPDATE SET recipe_id = EXCLUDED.recipe_id
+             RETURNING id`,
+			userID, body.RecipeID,
 		).Scan(&favID)
+
 		if err != nil {
+			// Полезно логировать ошибку в консоль сервера, чтобы видеть проблемы с БД
+			log.Printf("Error inserting into favorites: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save favorite"})
 			return
 		}
@@ -52,6 +62,7 @@ func GetFavorites(db *pgxpool.Pool) gin.HandlerFunc {
 		userEmail, _ := c.Get("email")
 		email := userEmail.(string)
 
+		// Получаем UUID пользователя
 		var userID string
 		err := db.QueryRow(context.Background(),
 			"SELECT id FROM users WHERE email = $1", email,
@@ -62,10 +73,20 @@ func GetFavorites(db *pgxpool.Pool) gin.HandlerFunc {
 		}
 
 		rows, err := db.Query(context.Background(),
-			`SELECT id, recipe, created_at FROM favorites WHERE user_id = $1 ORDER BY created_at DESC`,
+			`SELECT 
+                f.id, 
+                f.user_id::text,
+                f.recipe_id::text,
+                f.created_at,
+                r.recipe
+             FROM favorites f
+             INNER JOIN recipes r ON f.recipe_id = r.id 
+             WHERE f.user_id = $1::uuid
+             ORDER BY f.created_at DESC`,
 			userID,
 		)
 		if err != nil {
+			log.Printf("SQL Error in GetFavorites: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load favorites"})
 			return
 		}
@@ -74,10 +95,33 @@ func GetFavorites(db *pgxpool.Pool) gin.HandlerFunc {
 		favorites := []model.Favorite{}
 		for rows.Next() {
 			var fav model.Favorite
-			if err := rows.Scan(&fav.ID, &fav.Recipe, &fav.CreatedAt); err != nil {
+			var recipeBytes []byte
+
+			err := rows.Scan(
+				&fav.ID,
+				&fav.UserID,
+				&fav.RecipeID,
+				&fav.CreatedAt,
+				&recipeBytes,
+			)
+			if err != nil {
+				log.Printf("Error scanning row: %v", err)
 				continue
 			}
+
+			if err := json.Unmarshal(recipeBytes, &fav.Recipe); err != nil {
+				log.Printf("Error unmarshaling recipe JSON: %v", err)
+				continue
+			}
+
+			// 🟢 ТЕПЕРЬ ОШИБКИ НЕТ: Оба поля имеют тип string
+			fav.Recipe.ID = fav.RecipeID
+
 			favorites = append(favorites, fav)
+		}
+
+		if favorites == nil {
+			favorites = []model.Favorite{}
 		}
 
 		c.JSON(http.StatusOK, gin.H{"favorites": favorites})
@@ -98,7 +142,7 @@ func RemoveFavorite(db *pgxpool.Pool) gin.HandlerFunc {
 
 		var userID string
 		err = db.QueryRow(context.Background(),
-			"SELECT id FROM users WHERE email = $1", email,
+			"SELECT id::text FROM users WHERE email = $1", email,
 		).Scan(&userID)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
@@ -106,7 +150,7 @@ func RemoveFavorite(db *pgxpool.Pool) gin.HandlerFunc {
 		}
 
 		tag, err := db.Exec(context.Background(),
-			`DELETE FROM favorites WHERE id = $1 AND user_id = $2`,
+			`DELETE FROM favorites WHERE id = $1 AND user_id = $2::uuid`,
 			favID, userID,
 		)
 		if err != nil {

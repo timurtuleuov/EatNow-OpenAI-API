@@ -418,19 +418,21 @@ func main() {
 					return
 				}
 
-				// log := handlers.PromptLog{
-				// 	DeviceID:   body.DeviceID,
-				// 	Prompt:     body.Prompt,
-				// 	Response:   recipe,
-				// 	Model:      "gpt-4o-mini",
-				// 	DurationMs: int(duration),
-				// 	Success:    err == nil,
-				// 	ErrorMsg:   fmt.Sprintf("%v", err),
-				// 	AppVersion: "1.1.0",
-				// 	Language:   "ru",
-				// 	Country:    "KZ",
-				// }
-				// _ = handlers.LogPrompt(pool, log)
+				durMs := time.Since(start).Milliseconds()
+				logEntry := handlers.PromptLog{
+					UserID:     &email,
+					DeviceID:   body.DeviceID,
+					Prompt:     body.Prompt,
+					Response:   recipe,
+					TokensUsed: 0,
+					Model:      viper.GetString("openai.model"),
+					DurationMs: int(durMs),
+					Success:    true,
+					AppVersion: APP_VERSION,
+					Language:   "ru",
+					Country:    "KZ",
+				}
+				_ = handlers.LogPrompt(pool, logEntry)
 
 				c.JSON(http.StatusOK, gin.H{
 					"operation": opName, "data": recipe,
@@ -470,26 +472,27 @@ func main() {
 			case "RECIPE_PHOTO":
 
 				recipe, err := handlers.GetRecipeFromPhoto(refinedPrompt, body.Image)
-				// println("ТЕЛО:", recipe)
 				if err != nil {
 					log.Println("❌ Recipe generation error:", err)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 					return
 				}
 
-				// log := handlers.PromptLog{
-				// 	DeviceID:   body.DeviceID,
-				// 	Prompt:     body.Prompt,
-				// 	Response:   recipe,
-				// 	Model:      "gpt-4o-mini",
-				// 	DurationMs: int(duration),
-				// 	Success:    err == nil,
-				// 	ErrorMsg:   fmt.Sprintf("%v", err),
-				// 	AppVersion: "1.1.0",
-				// 	Language:   "ru",
-				// 	Country:    "KZ",
-				// }
-				// _ = handlers.LogPrompt(pool, log)
+				durMs := time.Since(start).Milliseconds()
+				logEntry := handlers.PromptLog{
+					UserID:     &email,
+					DeviceID:   body.DeviceID,
+					Prompt:     body.Prompt,
+					Response:   recipe,
+					TokensUsed: 0,
+					Model:      viper.GetString("openai.model"),
+					DurationMs: int(durMs),
+					Success:    true,
+					AppVersion: APP_VERSION,
+					Language:   "ru",
+					Country:    "KZ",
+				}
+				_ = handlers.LogPrompt(pool, logEntry)
 
 				c.JSON(http.StatusOK, gin.H{
 					"operation": opName, "data": recipe,
@@ -613,6 +616,8 @@ func main() {
 			favorites.GET("", handlers.GetFavorites(pool))
 			favorites.DELETE("/:id", handlers.RemoveFavorite(pool))
 		}
+
+		protected.GET("/recipes", handlers.GetUserRecipes(pool))
 
 		protected.POST("/substitute", func(c *gin.Context) {
 			userEmail, _ := c.Get("email")
