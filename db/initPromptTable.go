@@ -90,6 +90,7 @@ func InitTables(pool *pgxpool.Pool) error {
 	);
 
 	-- Миграция для существующей таблицы favorites (была колонка recipe JSONB, стала recipe_id UUID)
+	ALTER TABLE prompts DROP CONSTRAINT IF EXISTS fk_prompts_recipe;
 	ALTER TABLE favorites ADD COLUMN IF NOT EXISTS recipe_id UUID REFERENCES recipes(id) ON DELETE CASCADE;
 	ALTER TABLE favorites DROP CONSTRAINT IF EXISTS unique_user_recipe;
 	ALTER TABLE favorites ADD CONSTRAINT unique_user_recipe UNIQUE (user_id, recipe_id);

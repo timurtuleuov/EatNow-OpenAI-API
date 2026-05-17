@@ -618,6 +618,7 @@ func main() {
 		}
 
 		protected.GET("/recipes", handlers.GetUserRecipes(pool))
+		protected.DELETE("/recipes/:id", handlers.DeleteRecipe(pool))
 
 		protected.POST("/substitute", func(c *gin.Context) {
 			userEmail, _ := c.Get("email")

@@ -97,3 +97,40 @@ func GetUserRecipes(db *pgxpool.Pool) gin.HandlerFunc {
 		c.JSON(http.StatusOK, gin.H{"recipes": recipes})
 	}
 }
+
+func DeleteRecipe(db *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userEmail, _ := c.Get("email")
+		email := userEmail.(string)
+
+		recipeID := c.Param("id")
+		if recipeID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "missing recipe id"})
+			return
+		}
+
+		var userID string
+		err := db.QueryRow(context.Background(),
+			"SELECT id::text FROM users WHERE email = $1", email,
+		).Scan(&userID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
+
+		tag, err := db.Exec(context.Background(),
+			`DELETE FROM recipes WHERE id = $1::uuid AND user_id = $2::uuid`,
+			recipeID, userID,
+		)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete recipe"})
+			return
+		}
+		if tag.RowsAffected() == 0 {
+			c.JSON(http.StatusNotFound, gin.H{"error": "recipe not found or access denied"})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"status": "deleted"})
+	}
+}
