@@ -3,8 +3,9 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
+	"openai/internal/logger"
 	"strconv"
 
 	model "openai/models"
@@ -47,8 +48,10 @@ func AddToFavorites(db *pgxpool.Pool) gin.HandlerFunc {
 		).Scan(&favID)
 
 		if err != nil {
-			// Полезно логировать ошибку в консоль сервера, чтобы видеть проблемы с БД
-			log.Printf("Error inserting into favorites: %v", err)
+			slog.Error("favorite_insert_failed",
+				logger.KeyError, err,
+				logger.KeyUser, email,
+			)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save favorite"})
 			return
 		}
@@ -86,7 +89,10 @@ func GetFavorites(db *pgxpool.Pool) gin.HandlerFunc {
 			userID,
 		)
 		if err != nil {
-			log.Printf("SQL Error in GetFavorites: %v", err)
+			slog.Error("favorites_query_failed",
+				logger.KeyError, err,
+				logger.KeyUser, email,
+			)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load favorites"})
 			return
 		}
@@ -105,12 +111,18 @@ func GetFavorites(db *pgxpool.Pool) gin.HandlerFunc {
 				&recipeBytes,
 			)
 			if err != nil {
-				log.Printf("Error scanning row: %v", err)
+				slog.Error("favorite_scan_failed",
+					logger.KeyError, err,
+					logger.KeyUser, email,
+				)
 				continue
 			}
 
 			if err := json.Unmarshal(recipeBytes, &fav.Recipe); err != nil {
-				log.Printf("Error unmarshaling recipe JSON: %v", err)
+				slog.Error("favorite_unmarshal_failed",
+					logger.KeyError, err,
+					logger.KeyUser, email,
+				)
 				continue
 			}
 

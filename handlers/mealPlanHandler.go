@@ -26,7 +26,7 @@ func GenerateMealPlan(prompt string) (*model.MealPlan, error) {
 			openai.SystemMessage(viper.GetString("prompts.meal_plan")),
 			openai.UserMessage(prompt),
 		},
-		MaxCompletionTokens: openai.Int(4000),
+		MaxCompletionTokens: openai.Int(20000),
 	}
 
 	resp, err := client.Chat.Completions.New(context.Background(), params)

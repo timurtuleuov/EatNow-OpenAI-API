@@ -2,6 +2,9 @@ server:
   port: 8080
   is_prod: false
   free_daily_limit: 5
+
+logging:
+  level: "info"
   
 
 database:

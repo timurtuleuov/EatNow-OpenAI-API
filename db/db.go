@@ -3,6 +3,8 @@ package db
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"openai/internal/logger"
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,10 +29,14 @@ func Connect() (*pgxpool.Pool, error) {
 
 	pool, err := pgxpool.New(context.Background(), connStr)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "unable to connect to database: %v\n", err)
+		slog.Error("db_pool_create_failed",
+			logger.KeyError, err,
+		)
 		return nil, err
 	}
 
-	fmt.Println("✅ Connected to Postgres (pool)")
+	slog.Info("db_pool_created",
+		"is_prod", isProd,
+	)
 	return pool, nil
 }

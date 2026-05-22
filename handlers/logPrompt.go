@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
+	"openai/internal/logger"
 	"strings"
 	"time"
 
@@ -68,7 +70,9 @@ func LogPrompt(db *pgxpool.Pool, log PromptLog) error {
 	).Scan(&recipeId)
 
 	if err != nil {
-		fmt.Printf("[LogPrompt] Error inserting recipe: %v\n", err)
+		slog.Error("promptlog_recipe_insert_failed",
+			logger.KeyError, err,
+		)
 		return fmt.Errorf("failed to insert recipe: %w", err)
 	}
 

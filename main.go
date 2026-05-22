@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"log/slog"
 	"net/http"
 	"openai/db"
 	handlers "openai/handlers"
+	"openai/internal/logger"
 	model "openai/models"
 	"os"
 	"strings"
@@ -31,7 +31,9 @@ func InitConfig() {
 	load := func() {
 		viper.SetConfigFile(defaultFile)
 		if err := viper.ReadInConfig(); err != nil {
-			log.Printf("Ошибка дефолта: %v", err)
+			slog.Error("config_default_load_failed",
+				logger.KeyError, err,
+			)
 		}
 
 		// Накладываем локальный
@@ -39,7 +41,7 @@ func InitConfig() {
 		if err := viper.MergeInConfig(); err != nil {
 			// Не страшно, если локального нет
 		}
-		fmt.Println("✅ Конфиг успешно обновлен в памяти")
+		slog.Info("config_reloaded")
 	}
 
 	// 2. Первый запуск
@@ -48,11 +50,16 @@ func InitConfig() {
 	// 3. Создаем СВОЙ наблюдатель (Watcher)
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("watcher_create_failed",
+			logger.KeyError, err,
+		)
+		os.Exit(1)
 	}
 	// Мы не закрываем его (defer), так как он должен жить всё время работы сервера
 	if err := watcher.Add("./configs"); err != nil {
-		log.Printf("Ошибка watcher.Add: %v", err)
+		slog.Error("watcher_add_failed",
+			logger.KeyError, err,
+		)
 	}
 
 	// 5. Запускаем фоновый процесс обработки событий
@@ -65,14 +72,18 @@ func InitConfig() {
 				}
 				// Проверяем, было ли это изменение (Write)
 				if event.Op&fsnotify.Write == fsnotify.Write {
-					fmt.Printf("изменение в файле: %s\n", event.Name)
+					slog.Info("config_file_changed",
+						"file", event.Name,
+					)
 					load() // Перезагружаем данные в Viper
 				}
 			case err, ok := <-watcher.Errors:
 				if !ok {
 					return
 				}
-				log.Println("ошибка watcher:", err)
+				slog.Error("watcher_error",
+					logger.KeyError, err,
+				)
 			}
 		}
 	}()
@@ -105,20 +116,32 @@ func main() {
 	// 	log.Fatalf("Ошибка инициализации Gemini: %v", err)
 	// }
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-
-	slog.SetDefault(logger)
+	logLevel := slog.LevelInfo
+	switch viper.GetString("logging.level") {
+	case "debug":
+		logLevel = slog.LevelDebug
+	case "warn":
+		logLevel = slog.LevelWarn
+	case "error":
+		logLevel = slog.LevelError
+	}
+	isProd := viper.GetBool("server.is_prod")
+	logger.Init(logLevel, APP_VERSION, isProd)
 
 	pool, err := db.Connect()
 	if err != nil {
-		logger.Error("DB connection error", "message", err, "version", APP_VERSION)
+		slog.Error("db_connect_failed",
+			logger.KeyError, err,
+		)
 	}
 	defer pool.Close()
 
 	if err := db.InitTables(pool); err != nil {
-		logger.Error("Failed to initialize users table", "message", err, "version", APP_VERSION)
+		slog.Error("db_init_failed",
+			logger.KeyError, err,
+		)
 	}
-	logger.Info("Succesfully connected to the DB", "version", APP_VERSION)
+	slog.Info("db_connected")
 
 	router := gin.Default()
 
@@ -296,25 +319,25 @@ func main() {
 				IsBrainrot bool            `json:"is_brainrot"`
 			}
 
-			logger.Info("new_recipe_request",
-				"user_email", email,
+			slog.Info("new_recipe_request",
+				"user", email,
 				"has_image", body.Image != "",
 				"version", APP_VERSION,
 			)
 
 			if err := c.ShouldBindJSON(&body); err != nil {
-				logger.Error("request_parse_failed",
+				slog.Error("request_parse_failed",
 					"error", err,
-					"user_email", email,
+					"user", email,
 				)
 				c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON"})
 				return
 			}
 
 			if body.Prompt == "" {
-				logger.Warn("validation_failed",
+				slog.Warn("validation_failed",
 					"reason", "empty_prompt",
-					"user_email", email,
+					"user", email,
 				)
 				c.JSON(http.StatusBadRequest, gin.H{"error": "missing device_id or prompt"})
 				return
@@ -322,16 +345,16 @@ func main() {
 
 			allowed, err := handlers.CanUsePrompt(pool, userEmail.(string))
 			if err != nil {
-				logger.Error("db_error_check_limits",
+				slog.Error("db_error_check_limits",
 					"error", err,
-					"user_email", email,
+					"user", email,
 				)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
 				return
 			}
 			if !allowed {
 
-				logger.Warn("limit_reached", "user_email", email)
+				slog.Warn("limit_reached", "user", email)
 				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
 				return
 			}
@@ -347,19 +370,18 @@ func main() {
 			opName, refinedPrompt, err := handlers.DetectAIOperation(body.Prompt, body.History, hasImage, body.Image)
 
 			if err != nil {
-				logger.Error("ai_operation_detection_failed",
+				slog.Error("ai_operation_detection_failed",
 					"error", err,
-					"user_email", email,
+					"user", email,
 				)
 				// Если детектор упал, по умолчанию считаем это обычной консультацией или генерацией
 				opName = "CONSULT"
 				refinedPrompt = body.Prompt
 			}
 
-			logger.Info("ai_operation_detected",
-				"operation", opName,
-				"refined_prompt", refinedPrompt,
-				"user_email", email,
+			slog.Info("ai_operation_detected",
+				"op", opName,
+				"user", email,
 			)
 
 			switch opName {
@@ -371,7 +393,10 @@ func main() {
 
 				recipe, err := handlers.GetRecipeByPrompt(refinedPrompt)
 				isPremium := handlers.UserIsPremium(pool, email)
-				logger.Info("premium_check", "email", email, "is_premium", isPremium)
+				slog.Info("premium_check",
+					"user", email,
+					"is_premium", isPremium,
+				)
 
 				if isPremium {
 
@@ -382,28 +407,28 @@ func main() {
 						// Добавляем модификаторы промпта для генерации визуального безумия
 						imagePrompt += viper.GetString("prompts.brainrot_image_prompt")
 
-						logger.Info("brainrot_generation_triggered",
-							"user_email", email,
-							"operation", "GENERATE_IMAGE",
+						slog.Info("brainrot_generation_triggered",
+							"user", email,
+							"op", "GENERATE_IMAGE",
 						)
 					}
 					imgURL, err := handlers.GenerateImage(imagePrompt)
 					// imgURL, err := imgGen.GenerateGeminiImage(ctx, "Сделай картинку блюда по рецепту, без надписей:"+refinedPrompt)
 
 					if err != nil {
-						logger.Error("image_generation_failed",
+						slog.Error("image_generation_failed",
 							"error", err,
-							"user_email", email,
+							"user", email,
 						)
 					} else {
-						logger.Info("image_generation_success",
-							"user_email", email,
+						slog.Info("image_generation_success",
+							"user", email,
 						)
 					}
 					fileName, err := handlers.SaveImage(imgURL)
-					logger.Info("save_image",
+					slog.Info("save_image",
 						"fileName", fileName,
-						"user_email", email,
+						"user", email,
 					)
 					if err == nil {
 						recipe.ImageURL = &fileName
@@ -411,9 +436,12 @@ func main() {
 
 				}
 
-				// println("ТЕЛО:", recipe)
 				if err != nil {
-					log.Println("❌ Recipe generation error:", err)
+					slog.Error("recipe_gen_error",
+						logger.KeyError, err,
+						logger.KeyOp, "GENERATE",
+						logger.KeyUser, email,
+					)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 					return
 				}
@@ -443,9 +471,12 @@ func main() {
 				}
 
 				consult, err := handlers.Consult(refinedPrompt)
-				// println("ТЕЛО:", consult)
 				if err != nil {
-					log.Println("❌ Consult generation error:", err)
+					slog.Error("consult_gen_error",
+						logger.KeyError, err,
+						logger.KeyOp, "CONSULT",
+						logger.KeyUser, email,
+					)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 					return
 				}
@@ -459,9 +490,12 @@ func main() {
 				}
 
 				calories, err := handlers.Calories(refinedPrompt, body.Image)
-				// println("ТЕЛО:", calories)
 				if err != nil {
-					log.Println("❌ Consult generation error:", err)
+					slog.Error("calories_gen_error",
+						logger.KeyError, err,
+						logger.KeyOp, "CALORIES",
+						logger.KeyUser, email,
+					)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 					return
 				}
@@ -473,7 +507,11 @@ func main() {
 
 				recipe, err := handlers.GetRecipeFromPhoto(refinedPrompt, body.Image)
 				if err != nil {
-					log.Println("❌ Recipe generation error:", err)
+					slog.Error("recipe_photo_gen_error",
+						logger.KeyError, err,
+						logger.KeyOp, "RECIPE_PHOTO",
+						logger.KeyUser, email,
+					)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 					return
 				}
@@ -507,22 +545,21 @@ func main() {
 			duration := time.Since(start).Milliseconds()
 			if err != nil {
 				// 3. Логируем ошибку генерации с контекстом
-				logger.Error("ai_generation_failed",
-					"operation", opName,
+				slog.Error("ai_generation_failed",
+					"op", opName,
 					"error", err,
 					"duration_ms", duration,
-					"user_email", email,
+					"user", email,
 				)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to process ai request"})
 				return
 			}
 
-			logger.Info("recipe_processed_success",
-				"operation", opName,
+			slog.Info("recipe_processed_success",
+				"op", opName,
 				"duration_ms", duration,
-				"user_email", email,
-				"device_id", body.DeviceID,
-				"country", "KZ",
+				"user", email,
+				"device", body.DeviceID,
 			)
 		})
 
@@ -544,7 +581,9 @@ func main() {
 
 		protected.GET("/user/prompts-count", func(c *gin.Context) {
 			userEmail, _ := c.Get("email")
-			print(userEmail.(string))
+			slog.Debug("user_prompts_count_request",
+				logger.KeyUser, userEmail.(string),
+			)
 			if userEmail.(string) == "" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
 				return
@@ -601,12 +640,12 @@ func main() {
 
 			mealPlan, err := handlers.GenerateMealPlan(refinedPrompt)
 			if err != nil {
-				logger.Error("meal_plan_generation_failed", "error", err, "user_email", email)
+				slog.Error("meal_plan_generation_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			logger.Info("meal_plan_generated", "user_email", email, "days", len(mealPlan.Days))
+			slog.Info("meal_plan_generated", "user", email, "days", len(mealPlan.Days))
 			c.JSON(http.StatusOK, gin.H{"operation": "MEAL_PLAN", "data": mealPlan})
 		})
 
@@ -651,12 +690,12 @@ func main() {
 
 			result, err := handlers.GetSubstitutes(body.Ingredient, body.Reason)
 			if err != nil {
-				logger.Error("substitute_failed", "error", err, "user_email", email)
+				slog.Error("substitute_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			logger.Info("substitute_generated", "user_email", email, "ingredient", body.Ingredient)
+			slog.Info("substitute_generated", "user", email, "ingredient", body.Ingredient)
 			c.JSON(http.StatusOK, gin.H{"operation": "SUBSTITUTE", "data": result})
 		})
 
@@ -691,12 +730,12 @@ func main() {
 
 			result, err := handlers.WhatToCook(body.Ingredients, body.Preferences)
 			if err != nil {
-				logger.Error("what_to_cook_failed", "error", err, "user_email", email)
+				slog.Error("what_to_cook_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			logger.Info("what_to_cook_generated", "user_email", email, "ingredients_count", len(body.Ingredients))
+			slog.Info("what_to_cook_generated", "user", email, "ingredients_count", len(body.Ingredients))
 			c.JSON(http.StatusOK, gin.H{"operation": "WHAT_TO_COOK", "data": result})
 		})
 
@@ -730,12 +769,12 @@ func main() {
 
 			result, err := handlers.AnalyzeNutritionLog(body.Meals)
 			if err != nil {
-				logger.Error("nutrition_log_failed", "error", err, "user_email", email)
+				slog.Error("nutrition_log_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			logger.Info("nutrition_log_analyzed", "user_email", email, "meals", len(body.Meals))
+			slog.Info("nutrition_log_analyzed", "user", email, "meals", len(body.Meals))
 			c.JSON(http.StatusOK, gin.H{"operation": "NUTRITION_LOG", "data": result})
 		})
 

@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"fmt"
-	
+	"log/slog"
+	"openai/internal/logger"
+
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
@@ -14,7 +15,10 @@ func openaiApi() {
 	}
 
 	for i := 0; i < len(apiKeys); i++ { // Исправлено: i < len(apiKeys)
-		fmt.Printf("Попытка с ключом %d\n", i+1)
+		slog.Info("openai_key_attempt",
+			"key_index", i+1,
+			"total_keys", len(apiKeys),
+		)
 
 		client := openai.NewClient(
 			option.WithAPIKey(apiKeys[i]),
@@ -28,14 +32,20 @@ func openaiApi() {
 		})
 
 		if err != nil {
-			fmt.Printf("Ошибка с ключом %d: %v\n", i+1, err)
+			slog.Error("openai_key_failed",
+				logger.KeyError, err,
+				"key_index", i+1,
+			)
 			continue // Переходим к следующему ключу вместо остановки
 		}
 
-		fmt.Printf("Успех с ключом %d: %s\n", i+1, chatCompletion.Choices[0].Message.Content)
+		slog.Info("openai_key_success",
+			"key_index", i+1,
+		)
+		_ = chatCompletion
 	}
 
-	fmt.Println("Все итерации завершены")
+	slog.Info("openai_all_keys_tested")
 }
 
 // curl https://api.openai.com/v1/models \
