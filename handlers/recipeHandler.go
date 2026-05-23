@@ -21,15 +21,18 @@ import (
 
 // 🍳 GetRecipeByPrompt — основная функция, обращается к GPT и возвращает структуру рецепта.
 func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
-	var apiKey = viper.GetString("openai.api_key")
+	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
-		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
+		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
 	}
 
-	client := openai.NewClient(option.WithAPIKey(apiKey))
+	client := openai.NewClient(
+		option.WithAPIKey(apiKey),
+		option.WithBaseURL("https://api.deepseek.com/"),
+	)
 
 	params := openai.ChatCompletionNewParams{
-		Model: viper.GetString("openai.model"),
+		Model: viper.GetString("deepseek.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage(viper.GetString("prompts.generate_recipe")),
 			openai.UserMessage(prompt),
@@ -39,7 +42,7 @@ func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
 
 	resp, err := client.Chat.Completions.New(context.Background(), params)
 	if err != nil {
-		return nil, fmt.Errorf("OpenAI request failed: %w", err)
+		return nil, fmt.Errorf("DeepSeek request failed: %w", err)
 	}
 	// fmt.Println("🧾 RAW RESPONSE:", resp)
 
@@ -59,15 +62,18 @@ func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
 
 // тип операции консультация
 func Consult(prompt string) (*model.Consult, error) {
-	var apiKey = viper.GetString("openai.api_key")
+	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
-		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
+		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
 	}
 
-	client := openai.NewClient(option.WithAPIKey(apiKey))
+	client := openai.NewClient(
+		option.WithAPIKey(apiKey),
+		option.WithBaseURL("https://api.deepseek.com/"),
+	)
 
 	params := openai.ChatCompletionNewParams{
-		Model: viper.GetString("openai.model"),
+		Model: viper.GetString("deepseek.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage(viper.GetString("prompts.consult")),
 			openai.UserMessage(prompt),
@@ -96,15 +102,19 @@ func Consult(prompt string) (*model.Consult, error) {
 
 // рецепт с фото
 func GetRecipeFromPhoto(prompt, base64Image string) (*model.Recipe, error) {
-	var apiKey = viper.GetString("openai.api_key")
+	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
-		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
+		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
 	}
+
+	client := openai.NewClient(
+		option.WithAPIKey(apiKey),
+		option.WithBaseURL("https://api.deepseek.com/"),
+	)
 	imageUrl := fmt.Sprintf("data:image/jpeg;base64,%s", base64Image)
-	client := openai.NewClient(option.WithAPIKey(apiKey))
 
 	params := openai.ChatCompletionNewParams{
-		Model: viper.GetString("openai.model"),
+		Model: viper.GetString("deepseek.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 
 			openai.SystemMessage(viper.GetString("prompts.recipe_from_photo")),
@@ -143,16 +153,20 @@ func GetRecipeFromPhoto(prompt, base64Image string) (*model.Recipe, error) {
 
 // рецепт с фото
 func Calories(prompt, base64Image string) (*model.Calories, error) {
-	var apiKey = viper.GetString("openai.api_key")
+	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
-		return nil, fmt.Errorf("environment variable OPENAI_API_KEY not set")
+		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
 	}
 
+	client := openai.NewClient(
+		option.WithAPIKey(apiKey),
+		option.WithBaseURL("https://api.deepseek.com/"),
+	)
+
 	imageUrl := fmt.Sprintf("data:image/jpeg;base64,%s", base64Image)
-	client := openai.NewClient(option.WithAPIKey(apiKey))
 
 	params := openai.ChatCompletionNewParams{
-		Model: viper.GetString("openai.model"),
+		Model: viper.GetString("deepseek.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 
 			openai.SystemMessage(viper.GetString("prompts.calories_estimation")),
@@ -193,12 +207,15 @@ func Calories(prompt, base64Image string) (*model.Calories, error) {
 
 // Определение AI операции. Варианты: GENERATE, CALORIES, RECIPE_PHOTO, CONSULT
 func DetectAIOperation(prompt string, history []model.Message, hasImage bool, base64Image string) (string, string, error) {
-	var apiKey = viper.GetString("openai.api_key")
+	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
-		return "", "", fmt.Errorf("environment variable OPENAI_API_KEY not set")
+		return "", "", fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
 	}
 
-	client := openai.NewClient(option.WithAPIKey(apiKey))
+	client := openai.NewClient(
+		option.WithAPIKey(apiKey),
+		option.WithBaseURL("https://api.deepseek.com/"),
+	)
 
 	// 1. Выбираем базовый системный промпт
 	systemPromptKey := "prompts.detect_operation"
@@ -237,7 +254,7 @@ func DetectAIOperation(prompt string, history []model.Message, hasImage bool, ba
 
 	// 4. Запрос к модели
 	params := openai.ChatCompletionNewParams{
-		Model:    viper.GetString("openai.model"),
+		Model:    viper.GetString("deepseek.model"),
 		Messages: messages,
 
 		MaxCompletionTokens: openai.Int(100),

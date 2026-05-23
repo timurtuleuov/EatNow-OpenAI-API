@@ -25,6 +25,8 @@ func InitTables(pool *pgxpool.Pool) error {
 		premium_expires TIMESTAMPTZ,
 		daily_used_prompts INT DEFAULT 0,
 		last_prompt_date DATE,
+		balance INT DEFAULT 0,
+		balance_reset_at TIMESTAMPTZ DEFAULT NOW(),
 		created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
 		updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 	);
@@ -94,6 +96,19 @@ func InitTables(pool *pgxpool.Pool) error {
 	ALTER TABLE favorites ADD COLUMN IF NOT EXISTS recipe_id UUID REFERENCES recipes(id) ON DELETE CASCADE;
 	ALTER TABLE favorites DROP CONSTRAINT IF EXISTS unique_user_recipe;
 	ALTER TABLE favorites ADD CONSTRAINT unique_user_recipe UNIQUE (user_id, recipe_id);
+
+	-- Миграция для balance/bonus system
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS balance INT DEFAULT 0;
+	ALTER TABLE users ADD COLUMN IF NOT EXISTS balance_reset_at TIMESTAMPTZ DEFAULT NOW();
+
+	-- 8. Создаем таблицу планов питания
+	CREATE TABLE IF NOT EXISTS meal_plans (
+		id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+		user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+		meal_plan JSONB NOT NULL,
+		prompt TEXT,
+		created_at TIMESTAMPTZ DEFAULT NOW()
+	);
 
 	-- 7. Создаем таблицу с платежами
 	CREATE TABLE IF NOT EXISTS payments (

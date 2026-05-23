@@ -1,10 +1,29 @@
 server:
   port: 8080
   is_prod: false
-  free_daily_limit: 5
 
 logging:
   level: "info"
+
+pricing:
+  generate: 10
+  consult: 3
+  calories: 5
+  recipe_photo: 12
+  generate_image: 5
+  meal_plan: 15
+  substitute: 3
+  what_to_cook: 5
+  nutrition_log: 5
+
+balance:
+  free_monthly: 50
+  premium_monthly: 500
+  ad_reward: 10
+  reset_days: 30
+
+scheduler:
+  balance_reset_interval: "24h"
   
 
 database:

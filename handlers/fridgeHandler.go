@@ -14,12 +14,15 @@ import (
 )
 
 func WhatToCook(ingredients []string, preferences string) (*model.WhatToCookResponse, error) {
-	apiKey := viper.GetString("openai.api_key")
+	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
-		return nil, fmt.Errorf("OPENAI_API_KEY not set")
+		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
 	}
 
-	client := openai.NewClient(option.WithAPIKey(apiKey))
+	client := openai.NewClient(
+		option.WithAPIKey(apiKey),
+		option.WithBaseURL("https://api.deepseek.com/"),
+	)
 
 	prompt := fmt.Sprintf("Ингредиенты: %s.", strings.Join(ingredients, ", "))
 	if preferences != "" {
@@ -27,7 +30,7 @@ func WhatToCook(ingredients []string, preferences string) (*model.WhatToCookResp
 	}
 
 	params := openai.ChatCompletionNewParams{
-		Model: viper.GetString("openai.model"),
+		Model: viper.GetString("deepseek.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage(viper.GetString("prompts.what_to_cook")),
 			openai.UserMessage(prompt),

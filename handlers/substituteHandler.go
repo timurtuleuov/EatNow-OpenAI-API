@@ -13,12 +13,15 @@ import (
 )
 
 func GetSubstitutes(ingredient, reason string) (*model.SubstituteResponse, error) {
-	apiKey := viper.GetString("openai.api_key")
+	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
-		return nil, fmt.Errorf("OPENAI_API_KEY not set")
+		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
 	}
 
-	client := openai.NewClient(option.WithAPIKey(apiKey))
+	client := openai.NewClient(
+		option.WithAPIKey(apiKey),
+		option.WithBaseURL("https://api.deepseek.com/"),
+	)
 
 	prompt := fmt.Sprintf("Ингредиент: %s. Причина замены: %s.", ingredient, reason)
 	if reason == "" {
@@ -26,7 +29,7 @@ func GetSubstitutes(ingredient, reason string) (*model.SubstituteResponse, error
 	}
 
 	params := openai.ChatCompletionNewParams{
-		Model: viper.GetString("openai.model"),
+		Model: viper.GetString("deepseek.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage(viper.GetString("prompts.substitute")),
 			openai.UserMessage(prompt),

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"openai/db"
 	handlers "openai/handlers"
-	"openai/internal/logger"
+	logpkg "openai/internal/logger"
 	model "openai/models"
 	"os"
 	"strings"
@@ -32,7 +32,7 @@ func InitConfig() {
 		viper.SetConfigFile(defaultFile)
 		if err := viper.ReadInConfig(); err != nil {
 			slog.Error("config_default_load_failed",
-				logger.KeyError, err,
+				"error", err,
 			)
 		}
 
@@ -51,14 +51,14 @@ func InitConfig() {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		slog.Error("watcher_create_failed",
-			logger.KeyError, err,
+			"error", err,
 		)
 		os.Exit(1)
 	}
 	// Мы не закрываем его (defer), так как он должен жить всё время работы сервера
 	if err := watcher.Add("./configs"); err != nil {
 		slog.Error("watcher_add_failed",
-			logger.KeyError, err,
+			"error", err,
 		)
 	}
 
@@ -82,7 +82,7 @@ func InitConfig() {
 					return
 				}
 				slog.Error("watcher_error",
-					logger.KeyError, err,
+					"error", err,
 				)
 			}
 		}
@@ -126,22 +126,25 @@ func main() {
 		logLevel = slog.LevelError
 	}
 	isProd := viper.GetBool("server.is_prod")
-	logger.Init(logLevel, APP_VERSION, isProd)
+	logger := logpkg.Init(logLevel, APP_VERSION, isProd)
 
 	pool, err := db.Connect()
 	if err != nil {
-		slog.Error("db_connect_failed",
-			logger.KeyError, err,
+		logger.Error("db_connect_failed",
+			logpkg.KeyError, err,
 		)
 	}
 	defer pool.Close()
 
 	if err := db.InitTables(pool); err != nil {
-		slog.Error("db_init_failed",
-			logger.KeyError, err,
+		logger.Error("db_init_failed",
+			logpkg.KeyError, err,
 		)
 	}
-	slog.Info("db_connected")
+	logger.Info("db_connected")
+
+	interval, _ := time.ParseDuration(viper.GetString("scheduler.balance_reset_interval"))
+	go handlers.StartBalanceScheduler(pool, interval)
 
 	router := gin.Default()
 
@@ -319,14 +322,14 @@ func main() {
 				IsBrainrot bool            `json:"is_brainrot"`
 			}
 
-			slog.Info("new_recipe_request",
+			logger.Info("new_recipe_request",
 				"user", email,
 				"has_image", body.Image != "",
 				"version", APP_VERSION,
 			)
 
 			if err := c.ShouldBindJSON(&body); err != nil {
-				slog.Error("request_parse_failed",
+				logger.Error("request_parse_failed",
 					"error", err,
 					"user", email,
 				)
@@ -335,27 +338,11 @@ func main() {
 			}
 
 			if body.Prompt == "" {
-				slog.Warn("validation_failed",
+				logger.Warn("validation_failed",
 					"reason", "empty_prompt",
 					"user", email,
 				)
 				c.JSON(http.StatusBadRequest, gin.H{"error": "missing device_id or prompt"})
-				return
-			}
-
-			allowed, err := handlers.CanUsePrompt(pool, userEmail.(string))
-			if err != nil {
-				slog.Error("db_error_check_limits",
-					"error", err,
-					"user", email,
-				)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-				return
-			}
-			if !allowed {
-
-				slog.Warn("limit_reached", "user", email)
-				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
 				return
 			}
 
@@ -370,7 +357,7 @@ func main() {
 			opName, refinedPrompt, err := handlers.DetectAIOperation(body.Prompt, body.History, hasImage, body.Image)
 
 			if err != nil {
-				slog.Error("ai_operation_detection_failed",
+				logger.Error("ai_operation_detection_failed",
 					"error", err,
 					"user", email,
 				)
@@ -379,7 +366,7 @@ func main() {
 				refinedPrompt = body.Prompt
 			}
 
-			slog.Info("ai_operation_detected",
+			logger.Info("ai_operation_detected",
 				"op", opName,
 				"user", email,
 			)
@@ -391,9 +378,19 @@ func main() {
 					refinedPrompt = enrichWithTavily(tavilyKey, body.Prompt, body.IsBrainrot)
 				}
 
+				if err := handlers.CheckBalance(pool, email, viper.GetInt("pricing.generate")); err != nil {
+					logger.Warn("insufficient_balance",
+						"user", email,
+						"op", "GENERATE",
+						"error", err,
+					)
+					c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+					return
+				}
+
 				recipe, err := handlers.GetRecipeByPrompt(refinedPrompt)
 				isPremium := handlers.UserIsPremium(pool, email)
-				slog.Info("premium_check",
+				logger.Info("premium_check",
 					"user", email,
 					"is_premium", isPremium,
 				)
@@ -407,40 +404,47 @@ func main() {
 						// Добавляем модификаторы промпта для генерации визуального безумия
 						imagePrompt += viper.GetString("prompts.brainrot_image_prompt")
 
-						slog.Info("brainrot_generation_triggered",
+						logger.Info("brainrot_generation_triggered",
 							"user", email,
 							"op", "GENERATE_IMAGE",
 						)
 					}
-					imgURL, err := handlers.GenerateImage(imagePrompt)
-					// imgURL, err := imgGen.GenerateGeminiImage(ctx, "Сделай картинку блюда по рецепту, без надписей:"+refinedPrompt)
 
-					if err != nil {
-						slog.Error("image_generation_failed",
-							"error", err,
+					if err := handlers.CheckBalance(pool, email, viper.GetInt("pricing.generate_image")); err != nil {
+						logger.Warn("image_skipped_low_balance",
 							"user", email,
+							"error", err,
 						)
 					} else {
-						slog.Info("image_generation_success",
+						imgURL, err := handlers.GenerateImage(imagePrompt)
+
+						if err != nil {
+							logger.Error("image_generation_failed",
+								"error", err,
+								"user", email,
+							)
+						} else {
+							logger.Info("image_generation_success",
+								"user", email,
+							)
+						}
+						fileName, err := handlers.SaveImage(imgURL)
+						logger.Info("save_image",
+							"fileName", fileName,
 							"user", email,
 						)
-					}
-					fileName, err := handlers.SaveImage(imgURL)
-					slog.Info("save_image",
-						"fileName", fileName,
-						"user", email,
-					)
-					if err == nil {
-						recipe.ImageURL = &fileName
+						if err == nil {
+							recipe.ImageURL = &fileName
+						}
 					}
 
 				}
 
 				if err != nil {
-					slog.Error("recipe_gen_error",
-						logger.KeyError, err,
-						logger.KeyOp, "GENERATE",
-						logger.KeyUser, email,
+					logger.Error("recipe_gen_error",
+						logpkg.KeyError, err,
+						logpkg.KeyOp, "GENERATE",
+						logpkg.KeyUser, email,
 					)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 					return
@@ -470,12 +474,22 @@ func main() {
 					refinedPrompt = enrichWithTavily(tavilyKey, body.Prompt, body.IsBrainrot)
 				}
 
+				if err := handlers.CheckBalance(pool, email, viper.GetInt("pricing.consult")); err != nil {
+					logger.Warn("insufficient_balance",
+						"user", email,
+						"op", "CONSULT",
+						"error", err,
+					)
+					c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+					return
+				}
+
 				consult, err := handlers.Consult(refinedPrompt)
 				if err != nil {
-					slog.Error("consult_gen_error",
-						logger.KeyError, err,
-						logger.KeyOp, "CONSULT",
-						logger.KeyUser, email,
+					logger.Error("consult_gen_error",
+						logpkg.KeyError, err,
+						logpkg.KeyOp, "CONSULT",
+						logpkg.KeyUser, email,
 					)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 					return
@@ -489,12 +503,22 @@ func main() {
 					refinedPrompt = enrichWithTavily(tavilyKey, body.Prompt, body.IsBrainrot)
 				}
 
+				if err := handlers.CheckBalance(pool, email, viper.GetInt("pricing.calories")); err != nil {
+					logger.Warn("insufficient_balance",
+						"user", email,
+						"op", "CALORIES",
+						"error", err,
+					)
+					c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+					return
+				}
+
 				calories, err := handlers.Calories(refinedPrompt, body.Image)
 				if err != nil {
-					slog.Error("calories_gen_error",
-						logger.KeyError, err,
-						logger.KeyOp, "CALORIES",
-						logger.KeyUser, email,
+					logger.Error("calories_gen_error",
+						logpkg.KeyError, err,
+						logpkg.KeyOp, "CALORIES",
+						logpkg.KeyUser, email,
 					)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 					return
@@ -505,12 +529,22 @@ func main() {
 				})
 			case "RECIPE_PHOTO":
 
+				if err := handlers.CheckBalance(pool, email, viper.GetInt("pricing.recipe_photo")); err != nil {
+					logger.Warn("insufficient_balance",
+						"user", email,
+						"op", "RECIPE_PHOTO",
+						"error", err,
+					)
+					c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+					return
+				}
+
 				recipe, err := handlers.GetRecipeFromPhoto(refinedPrompt, body.Image)
 				if err != nil {
-					slog.Error("recipe_photo_gen_error",
-						logger.KeyError, err,
-						logger.KeyOp, "RECIPE_PHOTO",
-						logger.KeyUser, email,
+					logger.Error("recipe_photo_gen_error",
+						logpkg.KeyError, err,
+						logpkg.KeyOp, "RECIPE_PHOTO",
+						logpkg.KeyUser, email,
 					)
 					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 					return
@@ -545,7 +579,7 @@ func main() {
 			duration := time.Since(start).Milliseconds()
 			if err != nil {
 				// 3. Логируем ошибку генерации с контекстом
-				slog.Error("ai_generation_failed",
+				logger.Error("ai_generation_failed",
 					"op", opName,
 					"error", err,
 					"duration_ms", duration,
@@ -555,7 +589,7 @@ func main() {
 				return
 			}
 
-			slog.Info("recipe_processed_success",
+			logger.Info("recipe_processed_success",
 				"op", opName,
 				"duration_ms", duration,
 				"user", email,
@@ -571,7 +605,7 @@ func main() {
 				return
 			}
 
-			if err := handlers.GrantBonus(pool, userEmail.(string), "reward_ad", 168*time.Hour); err != nil {
+			if err := handlers.GrantBonus(pool, userEmail.(string), "reward_ad", viper.GetInt("balance.ad_reward")); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
@@ -581,8 +615,8 @@ func main() {
 
 		protected.GET("/user/prompts-count", func(c *gin.Context) {
 			userEmail, _ := c.Get("email")
-			slog.Debug("user_prompts_count_request",
-				logger.KeyUser, userEmail.(string),
+			logger.Debug("user_prompts_count_request",
+				logpkg.KeyUser, userEmail.(string),
 			)
 			if userEmail.(string) == "" {
 				c.JSON(http.StatusBadRequest, gin.H{"error": "missing required fields"})
@@ -623,13 +657,13 @@ func main() {
 				body.Prompt = "Составь план питания на неделю"
 			}
 
-			allowed, err := handlers.CanUsePrompt(pool, email)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-				return
-			}
-			if !allowed {
-				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
+			if err := handlers.CheckBalance(pool, email, viper.GetInt("pricing.meal_plan")); err != nil {
+				logger.Warn("insufficient_balance",
+					"user", email,
+					"op", "MEAL_PLAN",
+					"error", err,
+				)
+				c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 				return
 			}
 
@@ -640,14 +674,21 @@ func main() {
 
 			mealPlan, err := handlers.GenerateMealPlan(refinedPrompt)
 			if err != nil {
-				slog.Error("meal_plan_generation_failed", "error", err, "user", email)
+				logger.Error("meal_plan_generation_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			slog.Info("meal_plan_generated", "user", email, "days", len(mealPlan.Days))
+			if err := handlers.SaveMealPlan(pool, email, mealPlan, body.Prompt); err != nil {
+				logger.Error("save_meal_plan_failed", "error", err, "user", email)
+			}
+
+			logger.Info("meal_plan_generated", "user", email, "days", len(mealPlan.Days))
 			c.JSON(http.StatusOK, gin.H{"operation": "MEAL_PLAN", "data": mealPlan})
 		})
+
+		protected.GET("/meal-plan", handlers.GetLatestMealPlan(pool))
+		protected.GET("/meal-plans", handlers.GetUserMealPlans(pool))
 
 		favorites := protected.Group("/favorites")
 		{
@@ -678,24 +719,24 @@ func main() {
 				return
 			}
 
-			allowed, err := handlers.CanUsePrompt(pool, email)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-				return
-			}
-			if !allowed {
-				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
+			if err := handlers.CheckBalance(pool, email, viper.GetInt("pricing.substitute")); err != nil {
+				logger.Warn("insufficient_balance",
+					"user", email,
+					"op", "SUBSTITUTE",
+					"error", err,
+				)
+				c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 				return
 			}
 
 			result, err := handlers.GetSubstitutes(body.Ingredient, body.Reason)
 			if err != nil {
-				slog.Error("substitute_failed", "error", err, "user", email)
+				logger.Error("substitute_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			slog.Info("substitute_generated", "user", email, "ingredient", body.Ingredient)
+			logger.Info("substitute_generated", "user", email, "ingredient", body.Ingredient)
 			c.JSON(http.StatusOK, gin.H{"operation": "SUBSTITUTE", "data": result})
 		})
 
@@ -718,24 +759,24 @@ func main() {
 				return
 			}
 
-			allowed, err := handlers.CanUsePrompt(pool, email)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-				return
-			}
-			if !allowed {
-				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
+			if err := handlers.CheckBalance(pool, email, viper.GetInt("pricing.what_to_cook")); err != nil {
+				logger.Warn("insufficient_balance",
+					"user", email,
+					"op", "WHAT_TO_COOK",
+					"error", err,
+				)
+				c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 				return
 			}
 
 			result, err := handlers.WhatToCook(body.Ingredients, body.Preferences)
 			if err != nil {
-				slog.Error("what_to_cook_failed", "error", err, "user", email)
+				logger.Error("what_to_cook_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			slog.Info("what_to_cook_generated", "user", email, "ingredients_count", len(body.Ingredients))
+			logger.Info("what_to_cook_generated", "user", email, "ingredients_count", len(body.Ingredients))
 			c.JSON(http.StatusOK, gin.H{"operation": "WHAT_TO_COOK", "data": result})
 		})
 
@@ -757,24 +798,24 @@ func main() {
 				return
 			}
 
-			allowed, err := handlers.CanUsePrompt(pool, email)
-			if err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "db error"})
-				return
-			}
-			if !allowed {
-				c.JSON(http.StatusForbidden, gin.H{"error": "daily prompt limit reached"})
+			if err := handlers.CheckBalance(pool, email, viper.GetInt("pricing.nutrition_log")); err != nil {
+				logger.Warn("insufficient_balance",
+					"user", email,
+					"op", "NUTRITION_LOG",
+					"error", err,
+				)
+				c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 				return
 			}
 
 			result, err := handlers.AnalyzeNutritionLog(body.Meals)
 			if err != nil {
-				slog.Error("nutrition_log_failed", "error", err, "user", email)
+				logger.Error("nutrition_log_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
-			slog.Info("nutrition_log_analyzed", "user", email, "meals", len(body.Meals))
+			logger.Info("nutrition_log_analyzed", "user", email, "meals", len(body.Meals))
 			c.JSON(http.StatusOK, gin.H{"operation": "NUTRITION_LOG", "data": result})
 		})
 
