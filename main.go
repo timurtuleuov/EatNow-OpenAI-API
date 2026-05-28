@@ -128,7 +128,7 @@ func main() {
 	isProd := viper.GetBool("server.is_prod")
 	logger := logpkg.Init(logLevel, APP_VERSION, isProd)
 
-	pool, err := db.Connect()
+	pool, databaseURL, err := db.Connect()
 	if err != nil {
 		logger.Error("db_connect_failed",
 			logpkg.KeyError, err,
@@ -136,11 +136,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	if err := db.InitTables(pool); err != nil {
-		logger.Error("db_init_failed",
-			logpkg.KeyError, err,
-		)
-	}
+	db.RunMigrations(databaseURL)
 	logger.Info("db_connected")
 
 	interval, _ := time.ParseDuration(viper.GetString("scheduler.balance_reset_interval"))
@@ -464,7 +460,11 @@ func main() {
 					Language:   "ru",
 					Country:    "KZ",
 				}
-				_ = handlers.LogPrompt(pool, logEntry)
+				recipeDBID, _ := handlers.LogPrompt(pool, logEntry)
+
+				if recipeDBID != "" {
+					recipe.ID = recipeDBID
+				}
 
 				c.JSON(http.StatusOK, gin.H{
 					"operation": opName, "data": recipe,
@@ -564,7 +564,11 @@ func main() {
 					Language:   "ru",
 					Country:    "KZ",
 				}
-				_ = handlers.LogPrompt(pool, logEntry)
+				recipeDBID, _ := handlers.LogPrompt(pool, logEntry)
+
+				if recipeDBID != "" {
+					recipe.ID = recipeDBID
+				}
 
 				c.JSON(http.StatusOK, gin.H{
 					"operation": opName, "data": recipe,

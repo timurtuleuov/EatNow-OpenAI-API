@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func Connect() (*pgxpool.Pool, error) {
+func Connect() (*pgxpool.Pool, string, error) {
 	isProd := viper.GetBool("server.is_prod")
 	var connStr string
 	if isProd {
@@ -24,7 +24,7 @@ func Connect() (*pgxpool.Pool, error) {
 		connStr = fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
 			dbUser, dbPass, dbHost, dbPort, dbName)
 	} else {
-		connStr = "postgres://core:12345678@localhost:5432/eatnow"
+		connStr = "postgres://core:12345678@localhost:5432/eatnow?sslmode=disable"
 	}
 
 	pool, err := pgxpool.New(context.Background(), connStr)
@@ -32,11 +32,11 @@ func Connect() (*pgxpool.Pool, error) {
 		slog.Error("db_pool_create_failed",
 			logger.KeyError, err,
 		)
-		return nil, err
+		return nil, "", err
 	}
 
 	slog.Info("db_pool_created",
 		"is_prod", isProd,
 	)
-	return pool, nil
+	return pool, connStr, nil
 }

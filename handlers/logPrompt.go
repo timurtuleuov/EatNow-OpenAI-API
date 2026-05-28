@@ -46,7 +46,7 @@ func resolveUserID(db *pgxpool.Pool, userID *string) (*string, error) {
 	return userID, nil
 }
 
-func LogPrompt(db *pgxpool.Pool, log PromptLog) error {
+func LogPrompt(db *pgxpool.Pool, log PromptLog) (string, error) {
 	ctx := context.Background()
 
 	var recipeId string
@@ -58,7 +58,7 @@ func LogPrompt(db *pgxpool.Pool, log PromptLog) error {
 
 	userUUID, err := resolveUserID(db, log.UserID)
 	if err != nil {
-		return fmt.Errorf("failed to resolve user ID: %w", err)
+		return "", fmt.Errorf("failed to resolve user ID: %w", err)
 	}
 
 	err = db.QueryRow(ctx, `
@@ -73,7 +73,7 @@ func LogPrompt(db *pgxpool.Pool, log PromptLog) error {
 		slog.Error("promptlog_recipe_insert_failed",
 			logger.KeyError, err,
 		)
-		return fmt.Errorf("failed to insert recipe: %w", err)
+		return "", fmt.Errorf("failed to insert recipe: %w", err)
 	}
 
 	_, err = db.Exec(ctx, `
@@ -98,7 +98,7 @@ func LogPrompt(db *pgxpool.Pool, log PromptLog) error {
 		time.Now(),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to log prompt: %w", err)
+		return "", fmt.Errorf("failed to log prompt: %w", err)
 	}
-	return nil
+	return recipeId, nil
 }

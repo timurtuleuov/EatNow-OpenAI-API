@@ -1,0 +1,8 @@
+DROP TABLE IF EXISTS meal_plans;
+DROP TABLE IF EXISTS favorites;
+
+ALTER TABLE recipes DROP COLUMN IF EXISTS created_at;
+ALTER TABLE recipes DROP COLUMN IF EXISTS user_id;
+
+ALTER TABLE users DROP COLUMN IF EXISTS balance_reset_at;
+ALTER TABLE users DROP COLUMN IF EXISTS balance;

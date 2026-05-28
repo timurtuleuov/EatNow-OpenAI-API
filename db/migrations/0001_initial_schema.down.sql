@@ -1,0 +1,6 @@
+DROP TABLE IF EXISTS payments;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS user_bonuses;
+DROP TABLE IF EXISTS prompts;
+DROP TABLE IF EXISTS recipes;
+DROP TABLE IF EXISTS users;
