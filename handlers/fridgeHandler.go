@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func WhatToCook(ingredients []string, preferences string) (*model.WhatToCookResponse, error) {
+func WhatToCook(ingredients []string, preferences, dietaryContext string) (*model.WhatToCookResponse, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -29,10 +29,15 @@ func WhatToCook(ingredients []string, preferences string) (*model.WhatToCookResp
 		prompt += fmt.Sprintf(" Пожелания: %s.", preferences)
 	}
 
+	systemMsg := viper.GetString("prompts.what_to_cook")
+	if dietaryContext != "" {
+		systemMsg = dietaryContext + "\n\n" + systemMsg
+	}
+
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(viper.GetString("prompts.what_to_cook")),
+			openai.SystemMessage(systemMsg),
 			openai.UserMessage(prompt),
 		},
 		MaxCompletionTokens: openai.Int(2000),

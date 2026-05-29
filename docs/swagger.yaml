@@ -1,0 +1,1448 @@
+definitions:
+  handlers.FavoriteRequest:
+    properties:
+      recipe_id:
+        type: string
+    type: object
+  handlers.GoogleVerifyRequest:
+    properties:
+      email:
+        type: string
+      platform:
+        type: string
+      product_id:
+        type: string
+      purchase_token:
+        type: string
+      transaction_id:
+        type: string
+    type: object
+  handlers.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.MealPlanRecord:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      meal_plan:
+        $ref: '#/definitions/model.MealPlan'
+      prompt:
+        type: string
+    type: object
+  handlers.MealPlanRequest:
+    properties:
+      history:
+        items:
+          $ref: '#/definitions/model.Message'
+        type: array
+      is_brainrot:
+        type: boolean
+      prompt:
+        type: string
+    type: object
+  handlers.NutritionLogRequest:
+    properties:
+      meals:
+        items:
+          type: string
+        type: array
+    type: object
+  handlers.RecipeRequest:
+    properties:
+      device_id:
+        type: string
+      history:
+        items:
+          $ref: '#/definitions/model.Message'
+        type: array
+      image:
+        type: string
+      is_brainrot:
+        type: boolean
+      prompt:
+        type: string
+    type: object
+  handlers.RefreshRequest:
+    properties:
+      email:
+        type: string
+      refresh_token:
+        type: string
+    type: object
+  handlers.RegisterRequest:
+    properties:
+      device_id:
+        type: string
+      email:
+        type: string
+      password:
+        type: string
+      platform:
+        type: string
+      username:
+        type: string
+    type: object
+  handlers.SubstituteRequest:
+    properties:
+      ingredient:
+        type: string
+      reason:
+        type: string
+    type: object
+  handlers.UserRecipeItem:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      difficulty:
+        $ref: '#/definitions/model.Difficulty'
+      id:
+        type: string
+      image_url:
+        type: string
+      ingredients:
+        items:
+          $ref: '#/definitions/model.Ingredient'
+        type: array
+      nutrition:
+        additionalProperties: true
+        type: object
+      servings:
+        type: integer
+      source:
+        type: string
+      steps:
+        items:
+          $ref: '#/definitions/model.StepModel'
+        type: array
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      total_time_minutes:
+        type: integer
+    type: object
+  handlers.WhatToCookRequest:
+    properties:
+      ingredients:
+        items:
+          type: string
+        type: array
+      preferences:
+        type: string
+    type: object
+  model.DietaryProfile:
+    properties:
+      allergies:
+        items:
+          type: string
+        type: array
+      cuisine_preferences:
+        items:
+          type: string
+        type: array
+      daily_calorie_goal:
+        type: integer
+      daily_carbs_goal:
+        type: number
+      daily_fat_goal:
+        type: number
+      daily_protein_goal:
+        type: number
+      diet_type:
+        type: string
+      excluded_ingredients:
+        items:
+          type: string
+        type: array
+    type: object
+  model.Difficulty:
+    enum:
+    - easy
+    - medium
+    - hard
+    type: string
+    x-enum-varnames:
+    - DifficultyEasy
+    - DifficultyMedium
+    - DifficultyHard
+  model.Favorite:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      recipe:
+        allOf:
+        - $ref: '#/definitions/model.Recipe'
+        description: Объект рецепта, собираемый через JOIN
+      recipe_id:
+        description: Соответствует типу INT в новой таблице
+        type: string
+      user_id:
+        type: string
+    type: object
+  model.FridgeRecipe:
+    properties:
+      description:
+        type: string
+      difficulty:
+        type: string
+      match_percent:
+        type: integer
+      missing_ingredients:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      total_time_minutes:
+        type: integer
+    type: object
+  model.Ingredient:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      optional:
+        type: boolean
+      original_text:
+        type: string
+      prepared:
+        type: string
+      quantity:
+        type: number
+      unit:
+        type: string
+    type: object
+  model.MealEntry:
+    properties:
+      calories:
+        type: number
+      carbs_g:
+        type: number
+      fat_g:
+        type: number
+      name:
+        type: string
+      protein_g:
+        type: number
+    type: object
+  model.MealPlan:
+    properties:
+      days:
+        items:
+          $ref: '#/definitions/model.MealPlanDay'
+        type: array
+      grocery_list:
+        items:
+          type: string
+        type: array
+      tips:
+        items:
+          type: string
+        type: array
+    type: object
+  model.MealPlanDay:
+    properties:
+      breakfast:
+        $ref: '#/definitions/model.Recipe'
+      day:
+        type: string
+      dinner:
+        $ref: '#/definitions/model.Recipe'
+      lunch:
+        $ref: '#/definitions/model.Recipe'
+      snack:
+        $ref: '#/definitions/model.Recipe'
+    type: object
+  model.Message:
+    properties:
+      content:
+        type: string
+      role:
+        type: string
+    type: object
+  model.NutritionLog:
+    properties:
+      analysis:
+        type: string
+      created_at:
+        type: string
+      health_score:
+        type: integer
+      id:
+        type: string
+      log_date:
+        type: string
+      meals:
+        items:
+          $ref: '#/definitions/model.MealEntry'
+        type: array
+      tips:
+        items:
+          type: string
+        type: array
+      total:
+        $ref: '#/definitions/model.MealEntry'
+      updated_at:
+        type: string
+      user_id:
+        type: string
+      water_gl:
+        type: number
+    type: object
+  model.NutritionLogResponse:
+    properties:
+      analysis:
+        type: string
+      health_score:
+        type: integer
+      meals:
+        items:
+          $ref: '#/definitions/model.MealEntry'
+        type: array
+      tips:
+        items:
+          type: string
+        type: array
+      total:
+        $ref: '#/definitions/model.MealEntry'
+      water_gl:
+        type: number
+    type: object
+  model.NutritionStats:
+    properties:
+      average_calories:
+        type: number
+      average_carbs:
+        type: number
+      average_fat:
+        type: number
+      average_health_score:
+        type: number
+      average_protein:
+        type: number
+      log_count:
+        type: integer
+      period:
+        type: string
+    type: object
+  model.Recipe:
+    properties:
+      description:
+        type: string
+      difficulty:
+        $ref: '#/definitions/model.Difficulty'
+      id:
+        type: string
+      image_url:
+        type: string
+      ingredients:
+        items:
+          $ref: '#/definitions/model.Ingredient'
+        type: array
+      nutrition:
+        additionalProperties: true
+        type: object
+      servings:
+        type: integer
+      source:
+        type: string
+      steps:
+        items:
+          $ref: '#/definitions/model.StepModel'
+        type: array
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      total_time_minutes:
+        type: integer
+    type: object
+  model.StepModel:
+    properties:
+      description:
+        type: string
+      duration_seconds:
+        type: integer
+      ingredients_used:
+        items:
+          type: string
+        type: array
+      media_url:
+        type: string
+      order:
+        type: integer
+      temperature_c:
+        type: integer
+      tip:
+        type: string
+      title:
+        type: string
+    type: object
+  model.SubstituteResponse:
+    properties:
+      original:
+        type: string
+      reason:
+        type: string
+      substitutes:
+        items:
+          $ref: '#/definitions/model.SubstituteSuggestion'
+        type: array
+      tip:
+        type: string
+    type: object
+  model.SubstituteSuggestion:
+    properties:
+      ingredient:
+        type: string
+      ratio:
+        type: string
+      reason:
+        type: string
+    type: object
+  model.WhatToCookResponse:
+    properties:
+      recipes:
+        items:
+          $ref: '#/definitions/model.FridgeRecipe'
+        type: array
+      tip:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: AI-powered culinary assistant API. Generate recipes, analyze nutrition,
+    create meal plans, and more.
+  termsOfService: https://eatnow.app/terms
+  title: EatNow API
+  version: 1.3.0
+paths:
+  /api/favorites:
+    get:
+      description: Get all favorited recipes for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              favorites:
+                items:
+                  $ref: '#/definitions/model.Favorite'
+                type: array
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get favorites
+      tags:
+      - favorites
+    post:
+      consumes:
+      - application/json
+      description: Save a recipe to the user's favorites list
+      parameters:
+      - description: Recipe ID to favorite
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.FavoriteRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            properties:
+              id:
+                type: integer
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Add recipe to favorites
+      tags:
+      - favorites
+  /api/favorites/{id}:
+    delete:
+      description: Remove a recipe from favorites by favorite record ID
+      parameters:
+      - description: Favorite record ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Remove favorite
+      tags:
+      - favorites
+  /api/home:
+    get:
+      description: Simple health check
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            properties:
+              msg:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Home
+      tags:
+      - user
+  /api/me:
+    get:
+      description: Returns email and premium status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              email:
+                type: string
+              is_premium:
+                type: boolean
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get current user
+      tags:
+      - user
+  /api/me/profile:
+    get:
+      description: Returns full profile including dietary preferences and nutrition
+        goals
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              email:
+                type: string
+              is_premium:
+                type: boolean
+              profile:
+                $ref: '#/definitions/model.DietaryProfile'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get profile with dietary preferences
+      tags:
+      - user
+    put:
+      consumes:
+      - application/json
+      description: Update dietary profile, allergies, excluded ingredients, cuisine
+        preferences, and nutrition goals
+      parameters:
+      - description: Dietary preferences
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/model.DietaryProfile'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              profile:
+                $ref: '#/definitions/model.DietaryProfile'
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Update dietary preferences
+      tags:
+      - user
+  /api/meal-plan:
+    get:
+      description: Get the most recently generated meal plan
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              created_at:
+                type: string
+              data:
+                $ref: '#/definitions/model.MealPlan'
+              operation:
+                type: string
+              prompt:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get latest meal plan
+      tags:
+      - meal-plans
+    post:
+      consumes:
+      - application/json
+      description: Generate a 7-day meal plan with breakfast, lunch, dinner, and snack
+        for each day
+      parameters:
+      - description: Meal plan request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.MealPlanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: '#/definitions/model.MealPlan'
+              operation:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Generate weekly meal plan
+      tags:
+      - meal-plans
+  /api/meal-plans:
+    get:
+      description: Get all meal plans for the authenticated user, ordered by creation
+        date DESC
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              meal_plans:
+                items:
+                  $ref: '#/definitions/handlers.MealPlanRecord'
+                type: array
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get all meal plans
+      tags:
+      - meal-plans
+  /api/nutrition-log:
+    post:
+      consumes:
+      - application/json
+      description: Analyze a list of meals consumed during the day, returns nutrition
+        breakdown and health score. Automatically saves to the user's nutrition log.
+      parameters:
+      - description: Meals consumed
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.NutritionLogRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: '#/definitions/model.NutritionLogResponse'
+              log_id:
+                type: string
+              operation:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Analyze daily nutrition
+      tags:
+      - nutrition
+  /api/nutrition-logs:
+    get:
+      description: Get nutrition logs, optionally filtered by date
+      parameters:
+      - description: Filter by date (YYYY-MM-DD)
+        in: query
+        name: date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              logs:
+                items:
+                  $ref: '#/definitions/model.NutritionLog'
+                type: array
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get nutrition logs
+      tags:
+      - nutrition
+  /api/nutrition-logs/{id}:
+    delete:
+      description: Delete a nutrition log entry by its UUID
+      parameters:
+      - description: Nutrition log UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              status:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete nutrition log
+      tags:
+      - nutrition
+  /api/nutrition-logs/stats:
+    get:
+      description: Get aggregated nutrition statistics for the last week or month
+      parameters:
+      - description: 'Period: week or month'
+        enum:
+        - week
+        - month
+        in: query
+        name: period
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              stats:
+                $ref: '#/definitions/model.NutritionStats'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get nutrition statistics
+      tags:
+      - nutrition
+  /api/nutrition-logs/today:
+    get:
+      description: Get the nutrition log for the current date, or null if none exists
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              date:
+                type: string
+              log:
+                $ref: '#/definitions/model.NutritionLog'
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get today's nutrition log
+      tags:
+      - nutrition
+  /api/payments/verify-google:
+    post:
+      consumes:
+      - application/json
+      description: Verify a Google Play subscription purchase and activate premium
+      parameters:
+      - description: Google Play purchase verification
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.GoogleVerifyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              expires_at:
+                type: string
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Verify Google Play purchase
+      tags:
+      - payments
+  /api/recipe:
+    post:
+      consumes:
+      - application/json
+      description: 'Main AI endpoint. Auto-detects operation: GENERATE (text recipe),
+        CONSULT (culinary advice), CALORIES (nutrition estimation), RECIPE_PHOTO (recipe
+        from photo). Saves recipe to history on GENERATE and RECIPE_PHOTO.'
+      parameters:
+      - description: Recipe generation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RecipeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: '#/definitions/model.Recipe'
+              operation:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Generate recipe or get AI response
+      tags:
+      - recipes
+  /api/recipe/get-free:
+    post:
+      description: Grant bonus tokens for watching an ad
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get free bonus
+      tags:
+      - recipes
+  /api/recipes:
+    get:
+      description: Get all previously generated recipes for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              recipes:
+                items:
+                  $ref: '#/definitions/handlers.UserRecipeItem'
+                type: array
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user's recipes
+      tags:
+      - recipes
+  /api/recipes/{id}:
+    delete:
+      description: Delete a generated recipe by its UUID
+      parameters:
+      - description: Recipe UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Delete a recipe
+      tags:
+      - recipes
+  /api/substitute:
+    post:
+      consumes:
+      - application/json
+      description: Find alternative ingredients for a given ingredient, optionally
+        with a reason
+      parameters:
+      - description: Ingredient substitution request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.SubstituteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: '#/definitions/model.SubstituteResponse'
+              operation:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Find ingredient substitutes
+      tags:
+      - substitute
+  /api/user/prompts-count:
+    get:
+      description: Returns the current balance of the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              userFreePromptsCount:
+                type: integer
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user's prompt count / balance
+      tags:
+      - user
+  /api/what-to-cook:
+    post:
+      consumes:
+      - application/json
+      description: Suggest recipes based on ingredients the user has available
+      parameters:
+      - description: Available ingredients
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.WhatToCookRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              data:
+                $ref: '#/definitions/model.WhatToCookResponse'
+              operation:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Find recipes from available ingredients
+      tags:
+      - what-to-cook
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate with email and password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              access_token:
+                type: string
+              refresh_token:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Login
+      tags:
+      - auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Get a new access token using a refresh token
+      parameters:
+      - description: Refresh token details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              access_token:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Refresh access token
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user account with email and password
+      parameters:
+      - description: Registration details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              access_token:
+                type: string
+              refresh_token:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Register a new user
+      tags:
+      - auth
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -1,3 +1,17 @@
+// @title EatNow API
+// @version 1.3.0
+// @description AI-powered culinary assistant API. Generate recipes, analyze nutrition, create meal plans, and more.
+// @termsOfService https://eatnow.app/terms
+
+// @contactName EatNow Support
+// @contactEmail support@eatnow.app
+
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
+// @host localhost:8080
+// @BasePath
 package main
 
 import (
@@ -18,9 +32,27 @@ import (
 	// "github.com/joho/godotenv"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
+
+	_ "openai/docs"
 )
 
 var APP_VERSION = "1.2.0"
+
+const swaggerHTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>EatNow API - Swagger UI</title>
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    SwaggerUIBundle({ url: "/swagger.json", dom_id: "#swagger-ui" })
+  </script>
+</body>
+</html>`
 
 func InitConfig() {
 	// 1. Указываем файлы жестко, чтобы не путаться в именах
@@ -156,6 +188,16 @@ func main() {
 	}))
 
 	router.Static("/images", "./images")
+
+	router.GET("/swagger.json", func(c *gin.Context) {
+		c.File("./docs/swagger.json")
+	})
+	router.GET("/swagger", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/swagger/index.html")
+	})
+	router.GET("/swagger/index.html", func(c *gin.Context) {
+		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(swaggerHTML))
+	})
 
 	auth := router.Group("/auth")
 	{
@@ -306,6 +348,9 @@ func main() {
 
 		protected.GET("/me", handlers.GetMe(pool))
 
+		protected.GET("/me/profile", handlers.GetProfile(pool))
+		protected.PUT("/me/profile", handlers.UpdateProfile(pool))
+
 		protected.POST("/recipe", func(c *gin.Context) {
 			userEmail, _ := c.Get("email")
 			email := userEmail.(string)
@@ -384,7 +429,8 @@ func main() {
 					return
 				}
 
-				recipe, err := handlers.GetRecipeByPrompt(refinedPrompt)
+				dietaryCtx := handlers.BuildDietaryContext(pool, email)
+				recipe, err := handlers.GetRecipeByPrompt(refinedPrompt, dietaryCtx)
 				isPremium := handlers.UserIsPremium(pool, email)
 				logger.Info("premium_check",
 					"user", email,
@@ -484,7 +530,8 @@ func main() {
 					return
 				}
 
-				consult, err := handlers.Consult(refinedPrompt)
+				dietaryCtx := handlers.BuildDietaryContext(pool, email)
+				consult, err := handlers.Consult(refinedPrompt, dietaryCtx)
 				if err != nil {
 					logger.Error("consult_gen_error",
 						logpkg.KeyError, err,
@@ -513,7 +560,8 @@ func main() {
 					return
 				}
 
-				calories, err := handlers.Calories(refinedPrompt, body.Image)
+				dietaryCtx := handlers.BuildDietaryContext(pool, email)
+				calories, err := handlers.Calories(refinedPrompt, body.Image, dietaryCtx)
 				if err != nil {
 					logger.Error("calories_gen_error",
 						logpkg.KeyError, err,
@@ -539,7 +587,8 @@ func main() {
 					return
 				}
 
-				recipe, err := handlers.GetRecipeFromPhoto(refinedPrompt, body.Image)
+				dietaryCtx := handlers.BuildDietaryContext(pool, email)
+				recipe, err := handlers.GetRecipeFromPhoto(refinedPrompt, body.Image, dietaryCtx)
 				if err != nil {
 					logger.Error("recipe_photo_gen_error",
 						logpkg.KeyError, err,
@@ -576,7 +625,8 @@ func main() {
 
 			default:
 				// Если ИИ выдал что-то странное, просто консультируем
-				consult, _ := handlers.Consult(refinedPrompt)
+				dietaryCtx := handlers.BuildDietaryContext(pool, email)
+				consult, _ := handlers.Consult(refinedPrompt, dietaryCtx)
 				c.JSON(http.StatusOK, gin.H{"operation": "CONSULT", "data": consult})
 			}
 
@@ -676,7 +726,8 @@ func main() {
 				refinedPrompt = enrichWithTavily(tavilyKey, body.Prompt, body.IsBrainrot)
 			}
 
-			mealPlan, err := handlers.GenerateMealPlan(refinedPrompt)
+			dietaryCtx := handlers.BuildDietaryContext(pool, email)
+			mealPlan, err := handlers.GenerateMealPlan(refinedPrompt, dietaryCtx)
 			if err != nil {
 				logger.Error("meal_plan_generation_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -733,7 +784,8 @@ func main() {
 				return
 			}
 
-			result, err := handlers.GetSubstitutes(body.Ingredient, body.Reason)
+			dietaryCtx := handlers.BuildDietaryContext(pool, email)
+			result, err := handlers.GetSubstitutes(body.Ingredient, body.Reason, dietaryCtx)
 			if err != nil {
 				logger.Error("substitute_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -773,7 +825,8 @@ func main() {
 				return
 			}
 
-			result, err := handlers.WhatToCook(body.Ingredients, body.Preferences)
+			dietaryCtx := handlers.BuildDietaryContext(pool, email)
+			result, err := handlers.WhatToCook(body.Ingredients, body.Preferences, dietaryCtx)
 			if err != nil {
 				logger.Error("what_to_cook_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -812,16 +865,31 @@ func main() {
 				return
 			}
 
-			result, err := handlers.AnalyzeNutritionLog(body.Meals)
+			dietaryCtx := handlers.BuildDietaryContext(pool, email)
+			result, err := handlers.AnalyzeNutritionLog(body.Meals, dietaryCtx)
 			if err != nil {
 				logger.Error("nutrition_log_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 				return
 			}
 
+			logID, err := handlers.SaveNutritionLog(pool, email, result)
+			if err != nil {
+				logger.Error("nutrition_log_save_failed", "error", err, "user", email)
+			}
+
 			logger.Info("nutrition_log_analyzed", "user", email, "meals", len(body.Meals))
-			c.JSON(http.StatusOK, gin.H{"operation": "NUTRITION_LOG", "data": result})
+			c.JSON(http.StatusOK, gin.H{
+				"operation": "NUTRITION_LOG",
+				"data":      result,
+				"log_id":    logID,
+			})
 		})
+
+		protected.GET("/nutrition-logs", handlers.GetNutritionLogs(pool))
+		protected.GET("/nutrition-logs/today", handlers.GetNutritionLogToday(pool))
+		protected.GET("/nutrition-logs/stats", handlers.GetNutritionStats(pool))
+		protected.DELETE("/nutrition-logs/:id", handlers.DeleteNutritionLog(pool))
 
 	}
 

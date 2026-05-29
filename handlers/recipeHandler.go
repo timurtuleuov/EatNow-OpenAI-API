@@ -20,7 +20,7 @@ import (
 )
 
 // 🍳 GetRecipeByPrompt — основная функция, обращается к GPT и возвращает структуру рецепта.
-func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
+func GetRecipeByPrompt(prompt, dietaryContext string) (*model.Recipe, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -31,10 +31,15 @@ func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
 		option.WithBaseURL("https://api.deepseek.com/"),
 	)
 
+	systemMsg := viper.GetString("prompts.generate_recipe")
+	if dietaryContext != "" {
+		systemMsg = dietaryContext + "\n\n" + systemMsg
+	}
+
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(viper.GetString("prompts.generate_recipe")),
+			openai.SystemMessage(systemMsg),
 			openai.UserMessage(prompt),
 		},
 		MaxCompletionTokens: openai.Int(2000),
@@ -61,7 +66,7 @@ func GetRecipeByPrompt(prompt string) (*model.Recipe, error) {
 }
 
 // тип операции консультация
-func Consult(prompt string) (*model.Consult, error) {
+func Consult(prompt, dietaryContext string) (*model.Consult, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -72,10 +77,15 @@ func Consult(prompt string) (*model.Consult, error) {
 		option.WithBaseURL("https://api.deepseek.com/"),
 	)
 
+	systemMsg := viper.GetString("prompts.consult")
+	if dietaryContext != "" {
+		systemMsg = dietaryContext + "\n\n" + systemMsg
+	}
+
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(viper.GetString("prompts.consult")),
+			openai.SystemMessage(systemMsg),
 			openai.UserMessage(prompt),
 		},
 		MaxCompletionTokens: openai.Int(2000),
@@ -101,7 +111,7 @@ func Consult(prompt string) (*model.Consult, error) {
 }
 
 // рецепт с фото
-func GetRecipeFromPhoto(prompt, base64Image string) (*model.Recipe, error) {
+func GetRecipeFromPhoto(prompt, base64Image, dietaryContext string) (*model.Recipe, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -113,11 +123,16 @@ func GetRecipeFromPhoto(prompt, base64Image string) (*model.Recipe, error) {
 	)
 	imageUrl := fmt.Sprintf("data:image/jpeg;base64,%s", base64Image)
 
+	systemMsg := viper.GetString("prompts.recipe_from_photo")
+	if dietaryContext != "" {
+		systemMsg = dietaryContext + "\n\n" + systemMsg
+	}
+
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 
-			openai.SystemMessage(viper.GetString("prompts.recipe_from_photo")),
+			openai.SystemMessage(systemMsg),
 			openai.UserMessage(
 				[]openai.ChatCompletionContentPartUnionParam{
 					openai.TextContentPart(prompt),
@@ -152,7 +167,7 @@ func GetRecipeFromPhoto(prompt, base64Image string) (*model.Recipe, error) {
 }
 
 // рецепт с фото
-func Calories(prompt, base64Image string) (*model.Calories, error) {
+func Calories(prompt, base64Image, dietaryContext string) (*model.Calories, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -165,11 +180,16 @@ func Calories(prompt, base64Image string) (*model.Calories, error) {
 
 	imageUrl := fmt.Sprintf("data:image/jpeg;base64,%s", base64Image)
 
+	systemMsg := viper.GetString("prompts.calories_estimation")
+	if dietaryContext != "" {
+		systemMsg = dietaryContext + "\n\n" + systemMsg
+	}
+
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
 		Messages: []openai.ChatCompletionMessageParamUnion{
 
-			openai.SystemMessage(viper.GetString("prompts.calories_estimation")),
+			openai.SystemMessage(systemMsg),
 			openai.UserMessage(
 				[]openai.ChatCompletionContentPartUnionParam{
 					openai.TextContentPart(prompt),
