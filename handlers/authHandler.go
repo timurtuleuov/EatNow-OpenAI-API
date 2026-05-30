@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/spf13/viper"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -36,9 +37,9 @@ func CreateUser(db *pgxpool.Pool, username, email, password, platform, deviceID 
 	}
 
 	_, err = db.Exec(ctx, `
-		INSERT INTO users (name, password, email, platform, device_id)
-		VALUES ($1, $2, $3, $4, $5)
-	`, username, string(hashedPassword), email, platform, deviceID)
+		INSERT INTO users (name, password, email, platform, device_id, balance)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, username, string(hashedPassword), email, platform, deviceID, viper.GetInt("balance.free_monthly"))
 	if err != nil {
 		return false, fmt.Errorf("failed to insert user: %w", err)
 	}

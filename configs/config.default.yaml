@@ -24,7 +24,13 @@ balance:
 
 scheduler:
   balance_reset_interval: "24h"
-  
+
+smtp:
+  host: "smtp.gmail.com"
+  port: 587
+  username: "timmmur123@gmail.com"
+  password: "dvnd cplo cdvj rntg"
+  from: "EatNow <noreply@eatnow.app>"
 
 database:
   user: "core" 
@@ -33,7 +39,7 @@ database:
   port: 5432
   name: "eatnow"
 
-# Секция системных промптоввыфвфывыф
+# Секция системных промптов
 prompts:
   brainrot_image_prompt: ", brainrot style, aesthetic of internet memes, skibidi toilet elements, gigachad features, ohio vibes, surreal high quality funny visuals"
   # 1. Генерация рецептов из текста
@@ -76,6 +82,8 @@ prompts:
     5. STEPS: Cooking steps must be highly detailed, realistic, and logically ordered. Minimum 4 steps.
     6. NEVER use markdown formatting.
     7. Ensure valid JSON syntax.
+    8. Every step MUST include duration_seconds with a realistic positive value. Do NOT use 0 or omit it.
+    9. total_time_minutes MUST equal the sum of all duration_seconds divided by 60, rounded to the nearest minute.
 
     ### EXAMPLE OUTPUT (User asked in Russian):
     {
@@ -405,6 +413,11 @@ prompts:
       "tags": ["tag1", "tag2"],
       "source": "AI Vision"
     }
+
+    ### CRITICAL RULES:
+    1. Output ONLY raw JSON - no markdown, no explanations, no code fences.
+    2. Every step MUST include duration_seconds with a realistic positive value. Do NOT use 0 or omit it.
+    3. total_time_minutes MUST equal the sum of all duration_seconds divided by 60, rounded to the nearest minute.
 
   # 10. Дневник питания
   nutrition_log: |

@@ -62,6 +62,8 @@ func GetRecipeByPrompt(prompt, dietaryContext string) (*model.Recipe, error) {
 		return nil, fmt.Errorf("JSON parse error: %w\nRaw output:\n%s", err, raw)
 	}
 
+	normalizeRecipeTiming(&recipe)
+
 	return &recipe, nil
 }
 
@@ -162,6 +164,8 @@ func GetRecipeFromPhoto(prompt, base64Image, dietaryContext string) (*model.Reci
 	if err := json.Unmarshal([]byte(raw), &recipe); err != nil {
 		return nil, fmt.Errorf("JSON parse error: %w\nRaw output:\n%s", err, raw)
 	}
+
+	normalizeRecipeTiming(&recipe)
 
 	return &recipe, nil
 }
@@ -354,4 +358,27 @@ func SaveImage(base64Str string) (string, error) {
 	}
 
 	return filename, nil // <-- Возвращаем только имя "uuid.png"
+}
+
+func normalizeRecipeTiming(r *model.Recipe) {
+	if r == nil || len(r.Steps) == 0 {
+		return
+	}
+
+	for i := range r.Steps {
+		s := &r.Steps[i]
+		if s.DurationSeconds == nil || *s.DurationSeconds <= 0 {
+			v := 60
+			s.DurationSeconds = &v
+		}
+	}
+
+	var totalSec int
+	for _, s := range r.Steps {
+		if s.DurationSeconds != nil {
+			totalSec += *s.DurationSeconds
+		}
+	}
+
+	r.TotalTimeMinutes = (totalSec + 30) / 60
 }

@@ -29,7 +29,6 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 
-	// "github.com/joho/godotenv"
 	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 
@@ -138,15 +137,11 @@ func enrichWithTavily(tavilyKey, prompt string, isBrainrot bool) string {
 
 func main() {
 	InitConfig()
-	// if err := godotenv.Load("dependencies.env"); err != nil {
-	// 	log.Printf("Не удалось загрузить .env: %v", err)
-	// }
 
-	// ctx := context.Background()
-	// imgGen, err := handlers.NewImageGenerator(ctx)
-	// if err != nil {
-	// 	log.Fatalf("Ошибка инициализации Gemini: %v", err)
-	// }
+	if viper.GetString("deepseek.api_key") == "" {
+		slog.Error("config_validation_failed", "key", "deepseek.api_key")
+		os.Exit(1)
+	}
 
 	logLevel := slog.LevelInfo
 	switch viper.GetString("logging.level") {
@@ -165,6 +160,7 @@ func main() {
 		logger.Error("db_connect_failed",
 			logpkg.KeyError, err,
 		)
+		os.Exit(1)
 	}
 	defer pool.Close()
 
@@ -323,6 +319,9 @@ func main() {
 				"access_token": newAccessToken,
 			})
 		})
+
+		auth.POST("/forgot-password", handlers.ForgotPassword(pool))
+		auth.POST("/reset-password", handlers.ResetPassword(pool))
 	}
 
 	router.Use(func(c *gin.Context) {
@@ -753,6 +752,7 @@ func main() {
 		}
 
 		protected.GET("/recipes", handlers.GetUserRecipes(pool))
+		protected.GET("/recipes/:id/export", handlers.ExportRecipe(pool))
 		protected.DELETE("/recipes/:id", handlers.DeleteRecipe(pool))
 
 		protected.POST("/substitute", func(c *gin.Context) {

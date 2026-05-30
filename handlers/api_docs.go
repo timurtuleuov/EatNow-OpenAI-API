@@ -384,3 +384,36 @@ func _api_nutrition_logs_stats() {}
 // @Router /api/nutrition-logs/{id} [delete]
 // @Security BearerAuth
 func _api_nutrition_logs_delete() {}
+
+// @Summary Forgot password
+// @Description Send a password reset link to the user's email
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body object{email=string} true "User email"
+// @Success 200 {object} object{message=string}
+// @Failure 400 {object} object{error=string}
+// @Router /auth/forgot-password [post]
+func _auth_forgot_password() {}
+
+// @Summary Reset password
+// @Description Reset password using a token received by email
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param request body object{token=string,new_password=string} true "Reset token and new password"
+// @Success 200 {object} object{message=string}
+// @Failure 400 {object} object{error=string}
+// @Router /auth/reset-password [post]
+func _auth_reset_password() {}
+
+// @Summary Export recipe as text
+// @Description Export a recipe as plain text format
+// @Tags recipes
+// @Produce text/plain
+// @Param id path string true "Recipe UUID"
+// @Success 200 {string} string "Plain text recipe"
+// @Failure 404 {object} object{error=string}
+// @Router /api/recipes/{id}/export [get]
+// @Security BearerAuth
+func _api_recipes_export() {}
