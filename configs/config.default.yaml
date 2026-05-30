@@ -30,7 +30,7 @@ smtp:
   port: 587
   username: "timmmur123@gmail.com"
   password: "dvnd cplo cdvj rntg"
-  from: "EatNow <noreply@eatnow.app>"
+  from: "What2Eat <noreply@what2eat.app>"
 
 database:
   user: "core" 

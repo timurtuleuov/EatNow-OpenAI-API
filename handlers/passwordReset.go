@@ -6,8 +6,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
+
+	"openai/internal/logger"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -63,7 +66,7 @@ func ForgotPassword(db *pgxpool.Pool) gin.HandlerFunc {
 
 		sender := NewEmailSender()
 		if sender.Username != "" {
-			subject := "Восстановление пароля EatNow"
+			subject := "Восстановление пароля What2Eat"
 			resetLink := fmt.Sprintf("http://localhost:8080/reset-password?token=%s", token)
 			emailBody := fmt.Sprintf(`<!DOCTYPE html>
 <html>
@@ -76,7 +79,7 @@ func ForgotPassword(db *pgxpool.Pool) gin.HandlerFunc {
           <tr>
             <td style="background:#e74c3c; padding:30px; text-align:center;">
               <span style="font-size:48px;">🍳</span>
-              <h1 style="color:#fff; margin:8px 0 0; font-size:28px; font-weight:700;">EatNow</h1>
+              <h1 style="color:#fff; margin:8px 0 0; font-size:28px; font-weight:700;">What2Eat</h1>
             </td>
           </tr>
           <tr>
@@ -107,7 +110,16 @@ func ForgotPassword(db *pgxpool.Pool) gin.HandlerFunc {
   </table>
 </body>
 </html>`, resetLink, resetLink)
-			_ = sender.Send(body.Email, subject, emailBody)
+			if err := sender.Send(body.Email, subject, emailBody); err != nil {
+				slog.Error("email_send_failed",
+					logger.KeyError, err,
+					"to", body.Email,
+				)
+			} else {
+				slog.Info("email_sent",
+					"to", body.Email,
+				)
+			}
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "if the email exists, a reset link has been sent"})
@@ -161,5 +173,91 @@ func ResetPassword(db *pgxpool.Pool) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "password has been reset successfully"})
+	}
+}
+
+func ResetPasswordPage(pool *pgxpool.Pool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := c.Query("token")
+		if token == "" {
+			c.String(http.StatusBadRequest, "Missing token")
+			return
+		}
+
+		html := fmt.Sprintf(`<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Сброс пароля — What2Eat</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; background: #f4f4f4; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+  .card { background: #fff; padding: 40px; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.1); width: 100%%; max-width: 400px; text-align: center; }
+  .logo { font-size: 48px; margin-bottom: 8px; }
+  h1 { color: #e74c3c; font-size: 24px; margin: 0 0 24px; }
+  input { width: 100%%; padding: 14px 16px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px; outline: none; transition: border-color 0.2s; }
+  input:focus { border-color: #e74c3c; }
+  button { width: 100%%; padding: 14px; background: #e74c3c; color: #fff; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 12px; transition: background 0.2s; }
+  button:hover { background: #c0392b; }
+  button:disabled { background: #ccc; cursor: not-allowed; }
+  .message { padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; display: none; }
+  .message.error { display: block; background: #fdecea; color: #e74c3c; }
+  .message.success { display: block; background: #e8f8f0; color: #27ae60; }
+  .hint { color: #999; font-size: 13px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🍳</div>
+  <h1>Сброс пароля</h1>
+  <div id="message" class="message"></div>
+  <input type="password" id="password" placeholder="Новый пароль (мин. 6 символов)" minlength="6" autocomplete="new-password" autofocus>
+  <button id="submitBtn" onclick="resetPassword()">Сохранить новый пароль</button>
+  <p class="hint">Не запрашивали сброс? Просто проигнорируйте это письмо.</p>
+</div>
+<script>
+async function resetPassword() {
+  const pass = document.getElementById('password').value;
+  const msg = document.getElementById('message');
+  const btn = document.getElementById('submitBtn');
+
+  if (pass.length < 6) {
+    msg.className = 'message error';
+    msg.textContent = 'Минимум 6 символов';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Сохранение...';
+
+  try {
+    const r = await fetch('/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: '%s', new_password: pass })
+    });
+    const d = await r.json();
+    if (d.error) {
+      msg.className = 'message error';
+      msg.textContent = d.error;
+      btn.disabled = false;
+      btn.textContent = 'Сохранить новый пароль';
+    } else {
+      msg.className = 'message success';
+      msg.textContent = '✅ ' + d.message;
+      document.getElementById('password').style.display = 'none';
+      btn.style.display = 'none';
+    }
+  } catch(e) {
+    msg.className = 'message error';
+    msg.textContent = 'Ошибка соединения с сервером';
+    btn.disabled = false;
+    btn.textContent = 'Сохранить новый пароль';
+  }
+}
+</script>
+</body>
+</html>`, token)
+
+		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 	}
 }

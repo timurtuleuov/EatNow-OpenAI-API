@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/smtp"
+	"strings"
 
 	"github.com/spf13/viper"
 )
@@ -25,6 +26,15 @@ func NewEmailSender() *EmailSender {
 	}
 }
 
+func (e *EmailSender) fromAddress() string {
+	if i := strings.Index(e.From, "<"); i >= 0 {
+		if j := strings.LastIndex(e.From, ">"); j > i {
+			return e.From[i+1 : j]
+		}
+	}
+	return e.From
+}
+
 func (e *EmailSender) Send(to, subject, body string) error {
 	if e.Username == "" || e.Password == "" {
 		return nil
@@ -36,5 +46,5 @@ func (e *EmailSender) Send(to, subject, body string) error {
 	addr := fmt.Sprintf("%s:%d", e.Host, e.Port)
 	auth := smtp.PlainAuth("", e.Username, e.Password, e.Host)
 
-	return smtp.SendMail(addr, auth, e.From, []string{to}, []byte(msg))
+	return smtp.SendMail(addr, auth, e.fromAddress(), []string{to}, []byte(msg))
 }

@@ -1,9 +1,9 @@
-// @title EatNow API
+// @title What2Eat API
 // @version 1.3.0
 // @description AI-powered culinary assistant API. Generate recipes, analyze nutrition, create meal plans, and more.
 // @termsOfService https://eatnow.app/terms
 
-// @contactName EatNow Support
+// @contactName What2Eat Support
 // @contactEmail support@eatnow.app
 
 // @securityDefinitions.apikey BearerAuth
@@ -41,7 +41,7 @@ const swaggerHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>EatNow API - Swagger UI</title>
+  <title>What2Eat API - Swagger UI</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
 </head>
 <body>
@@ -194,6 +194,8 @@ func main() {
 	router.GET("/swagger/index.html", func(c *gin.Context) {
 		c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(swaggerHTML))
 	})
+
+	router.GET("/reset-password", handlers.ResetPasswordPage(pool))
 
 	auth := router.Group("/auth")
 	{

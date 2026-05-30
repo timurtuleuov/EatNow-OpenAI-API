@@ -430,7 +430,7 @@ info:
   description: AI-powered culinary assistant API. Generate recipes, analyze nutrition,
     create meal plans, and more.
   termsOfService: https://eatnow.app/terms
-  title: EatNow API
+  title: What2Eat API
   version: 1.3.0
 paths:
   /api/favorites:

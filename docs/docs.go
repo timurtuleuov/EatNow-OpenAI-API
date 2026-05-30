@@ -2443,7 +2443,7 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:8080",
 	BasePath:         "",
 	Schemes:          []string{},
-	Title:            "EatNow API",
+	Title:            "What2Eat API",
 	Description:      "AI-powered culinary assistant API. Generate recipes, analyze nutrition, create meal plans, and more.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
