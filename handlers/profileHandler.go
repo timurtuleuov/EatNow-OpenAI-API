@@ -137,5 +137,9 @@ func BuildDietaryContext(db *pgxpool.Pool, email string) string {
 		return ""
 	}
 
-	return "User dietary preferences: " + strings.Join(parts, ". ") + "."
+	return "!!! CRITICAL DIETARY RESTRICTIONS - MUST BE STRICTLY FOLLOWED !!!\n" +
+		strings.Join(parts, "\n") + "\n\n" +
+		"The above restrictions are absolute requirements. " +
+		"DO NOT include any excluded ingredients or allergens in the recipe. " +
+		"These rules OVERRIDE all other recipe instructions."
 }
