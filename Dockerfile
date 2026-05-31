@@ -1,5 +1,5 @@
 # Этап сборки
-FROM golang:1.23 AS builder
+FROM golang:1.25 AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
