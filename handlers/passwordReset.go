@@ -66,7 +66,7 @@ func ForgotPassword(db *pgxpool.Pool) gin.HandlerFunc {
 
 		sender := NewEmailSender()
 		if sender.Username != "" {
-			subject := "Восстановление пароля What2Eat"
+			subject := "What2Eat Password Reset"
 			resetLink := fmt.Sprintf("http://localhost:8080/reset-password?token=%s", token)
 			emailBody := fmt.Sprintf(`<!DOCTYPE html>
 <html>
@@ -84,14 +84,14 @@ func ForgotPassword(db *pgxpool.Pool) gin.HandlerFunc {
           </tr>
           <tr>
             <td style="padding:40px 30px; text-align:center;">
-              <h2 style="color:#333; margin:0 0 12px; font-size:22px;">Восстановление пароля</h2>
+              <h2 style="color:#333; margin:0 0 12px; font-size:22px;">Password Reset</h2>
               <p style="color:#666; font-size:15px; line-height:1.5; margin:0 0 28px;">
-                Вы получили это письмо, потому что запросили сброс пароля.<br>
-                Нажмите кнопку ниже, чтобы задать новый пароль:
+                You received this email because you requested a password reset.<br>
+                Click the button below to set a new password:
               </p>
-              <a href="%s" style="display:inline-block; background:#e74c3c; color:#fff; padding:14px 36px; border-radius:8px; text-decoration:none; font-size:16px; font-weight:600;">Сбросить пароль</a>
+              <a href="%s" style="display:inline-block; background:#e74c3c; color:#fff; padding:14px 36px; border-radius:8px; text-decoration:none; font-size:16px; font-weight:600;">Reset Password</a>
               <p style="color:#999; font-size:13px; margin-top:30px; line-height:1.4;">
-                Если кнопка не работает, скопируйте ссылку в браузер:<br>
+                If the button doesn't work, copy this link into your browser:<br>
                 <span style="color:#666; word-break:break-all;">%s</span>
               </p>
             </td>
@@ -99,8 +99,8 @@ func ForgotPassword(db *pgxpool.Pool) gin.HandlerFunc {
           <tr>
             <td style="background:#f8f9fa; padding:20px 30px; text-align:center;">
               <p style="color:#aaa; font-size:12px; margin:0; line-height:1.4;">
-                Ссылка действительна 1 час.<br>
-                Если вы не запрашивали восстановление пароля, просто проигнорируйте это письмо.
+                This link expires in 1 hour.<br>
+                If you didn't request a password reset, please ignore this email.
               </p>
             </td>
           </tr>
@@ -187,7 +187,7 @@ func ResetPasswordPage(pool *pgxpool.Pool) gin.HandlerFunc {
 		html := fmt.Sprintf(`<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Сброс пароля — What2Eat</title>
+<title>Password Reset — What2Eat</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; background: #f4f4f4; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
@@ -208,11 +208,11 @@ func ResetPasswordPage(pool *pgxpool.Pool) gin.HandlerFunc {
 <body>
 <div class="card">
   <div class="logo">🍳</div>
-  <h1>Сброс пароля</h1>
+  <h1>Password Reset</h1>
   <div id="message" class="message"></div>
-  <input type="password" id="password" placeholder="Новый пароль (мин. 6 символов)" minlength="6" autocomplete="new-password" autofocus>
-  <button id="submitBtn" onclick="resetPassword()">Сохранить новый пароль</button>
-  <p class="hint">Не запрашивали сброс? Просто проигнорируйте это письмо.</p>
+  <input type="password" id="password" placeholder="New password (min. 6 characters)" minlength="6" autocomplete="new-password" autofocus>
+  <button id="submitBtn" onclick="resetPassword()">Save New Password</button>
+  <p class="hint">Didn't request this? Ignore this email.</p>
 </div>
 <script>
 async function resetPassword() {
@@ -222,12 +222,12 @@ async function resetPassword() {
 
   if (pass.length < 6) {
     msg.className = 'message error';
-    msg.textContent = 'Минимум 6 символов';
+    msg.textContent = 'At least 6 characters';
     return;
   }
 
   btn.disabled = true;
-  btn.textContent = 'Сохранение...';
+    btn.textContent = 'Saving...';
 
   try {
     const r = await fetch('/api/auth/reset-password', {
@@ -240,7 +240,7 @@ async function resetPassword() {
       msg.className = 'message error';
       msg.textContent = d.error;
       btn.disabled = false;
-      btn.textContent = 'Сохранить новый пароль';
+      btn.textContent = 'Save New Password';
     } else {
       msg.className = 'message success';
       msg.textContent = '✅ ' + d.message;
@@ -249,9 +249,9 @@ async function resetPassword() {
     }
   } catch(e) {
     msg.className = 'message error';
-    msg.textContent = 'Ошибка соединения с сервером';
+    msg.textContent = 'Connection error';
     btn.disabled = false;
-    btn.textContent = 'Сохранить новый пароль';
+    btn.textContent = 'Save New Password';
   }
 }
 </script>

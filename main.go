@@ -1,5 +1,5 @@
 // @title What2Eat API
-// @version 1.3.0
+// @version 1.3.1
 // @description AI-powered culinary assistant API. Generate recipes, analyze nutrition, create meal plans, and more.
 // @termsOfService https://eatnow.app/terms
 
@@ -35,7 +35,7 @@ import (
 	_ "openai/docs"
 )
 
-var APP_VERSION = "1.3.0"
+var APP_VERSION = "1.3.1"
 
 const swaggerHTML = `<!DOCTYPE html>
 <html lang="en">
