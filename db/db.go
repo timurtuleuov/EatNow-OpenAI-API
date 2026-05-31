@@ -21,7 +21,7 @@ func Connect() (*pgxpool.Pool, string, error) {
 		dbPort := os.Getenv("POSTGRES_PORT") // обычно 5432
 		dbName := os.Getenv("POSTGRES_DB")
 
-		connStr = fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
+		connStr = fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 			dbUser, dbPass, dbHost, dbPort, dbName)
 	} else {
 		connStr = "postgres://core:12345678@localhost:5432/eatnow?sslmode=disable"

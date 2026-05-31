@@ -230,7 +230,7 @@ async function resetPassword() {
   btn.textContent = 'Сохранение...';
 
   try {
-    const r = await fetch('/auth/reset-password', {
+    const r = await fetch('/api/auth/reset-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: '%s', new_password: pass })

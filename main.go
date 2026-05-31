@@ -197,7 +197,7 @@ func main() {
 
 	router.GET("/reset-password", handlers.ResetPasswordPage(pool))
 
-	auth := router.Group("/auth")
+	auth := router.Group("/api/auth")
 	{
 		auth.POST("/register", func(c *gin.Context) {
 			var body struct {

@@ -65,7 +65,7 @@ type (
 // @Param request body RegisterRequest true "Registration details"
 // @Success 200 {object} object{access_token=string,refresh_token=string}
 // @Failure 400 {object} object{error=string}
-// @Router /auth/register [post]
+// @Router /api/auth/register [post]
 func _auth_register() {}
 
 // @Summary Login
@@ -77,7 +77,7 @@ func _auth_register() {}
 // @Success 200 {object} object{access_token=string,refresh_token=string}
 // @Failure 400 {object} object{error=string}
 // @Failure 401 {object} object{error=string}
-// @Router /auth/login [post]
+// @Router /api/auth/login [post]
 func _auth_login() {}
 
 // @Summary Refresh access token
@@ -89,7 +89,7 @@ func _auth_login() {}
 // @Success 200 {object} object{access_token=string}
 // @Failure 400 {object} object{error=string}
 // @Failure 401 {object} object{error=string}
-// @Router /auth/refresh [post]
+// @Router /api/auth/refresh [post]
 func _auth_refresh() {}
 
 // User endpoints
@@ -393,7 +393,7 @@ func _api_nutrition_logs_delete() {}
 // @Param request body object{email=string} true "User email"
 // @Success 200 {object} object{message=string}
 // @Failure 400 {object} object{error=string}
-// @Router /auth/forgot-password [post]
+// @Router /api/auth/forgot-password [post]
 func _auth_forgot_password() {}
 
 // @Summary Reset password
@@ -404,7 +404,7 @@ func _auth_forgot_password() {}
 // @Param request body object{token=string,new_password=string} true "Reset token and new password"
 // @Success 200 {object} object{message=string}
 // @Failure 400 {object} object{error=string}
-// @Router /auth/reset-password [post]
+// @Router /api/auth/reset-password [post]
 func _auth_reset_password() {}
 
 // @Summary Export recipe as text
