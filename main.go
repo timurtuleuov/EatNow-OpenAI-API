@@ -35,7 +35,7 @@ import (
 	_ "openai/docs"
 )
 
-var APP_VERSION = "1.3.1"
+var APP_VERSION = "1.3.2"
 
 const swaggerHTML = `<!DOCTYPE html>
 <html lang="en">
