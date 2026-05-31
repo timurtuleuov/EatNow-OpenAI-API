@@ -1,32 +1,51 @@
-name: Deploy to VPS
+name: Deploy Backend
 
 on:
   push:
     branches: [ "master" ]
 
 jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/ВАШ_НИК/eatnow:latest
+
   deploy:
+    needs: build-and-push
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Copy files to VPS
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "./*" # Копируем всё содержимое
-          target: "./Projects/eatnow"
-
       - name: Deploy via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.SSH_PASSWORD }}
           script: |
-            cd /home/${{ secrets.SSH_USER }}/my-project
-            docker compose down
-            docker compose up -d --build
+            # Логинимся в реестр на сервере
+            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            # Переходим к docker-compose
+            cd /Projects/eatnow
+            
+            # Скачиваем ТОЛЬКО новый образ бэкенда
+            docker compose pull app
+            
+            # Пересоздаем ТОЛЬКО контейнер app (остальные не трогаем)
+            docker compose up -d --no-deps app
