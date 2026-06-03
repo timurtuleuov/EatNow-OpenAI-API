@@ -107,13 +107,21 @@ func BuildDietaryContext(db *pgxpool.Pool, email string) string {
 			COALESCE(diet_type, ''),
 			COALESCE(allergies, '{}'),
 			COALESCE(excluded_ingredients, '{}'),
-			COALESCE(cuisine_preferences, '{}')
+			COALESCE(cuisine_preferences, '{}'),
+			COALESCE(daily_calorie_goal, 0),
+			COALESCE(daily_protein_goal, 0),
+			COALESCE(daily_fat_goal, 0),
+			COALESCE(daily_carbs_goal, 0)
 		FROM users WHERE email = $1
 	`, email).Scan(
 		&profile.DietType,
 		&profile.Allergies,
 		&profile.ExcludedIngredients,
 		&profile.CuisinePreferences,
+		&profile.DailyCalorieGoal,
+		&profile.DailyProteinGoal,
+		&profile.DailyFatGoal,
+		&profile.DailyCarbsGoal,
 	)
 	if err != nil {
 		return ""
@@ -131,6 +139,25 @@ func BuildDietaryContext(db *pgxpool.Pool, email string) string {
 	}
 	if len(profile.CuisinePreferences) > 0 {
 		parts = append(parts, fmt.Sprintf("Preferred cuisines: %s", strings.Join(profile.CuisinePreferences, ", ")))
+	}
+
+	hasAnyGoal := profile.DailyCalorieGoal > 0 || profile.DailyProteinGoal > 0 ||
+		profile.DailyFatGoal > 0 || profile.DailyCarbsGoal > 0
+	if hasAnyGoal {
+		var goalParts []string
+		if profile.DailyCalorieGoal > 0 {
+			goalParts = append(goalParts, fmt.Sprintf("%d kcal", profile.DailyCalorieGoal))
+		}
+		if profile.DailyProteinGoal > 0 {
+			goalParts = append(goalParts, fmt.Sprintf("protein %.0fg", profile.DailyProteinGoal))
+		}
+		if profile.DailyFatGoal > 0 {
+			goalParts = append(goalParts, fmt.Sprintf("fat %.0fg", profile.DailyFatGoal))
+		}
+		if profile.DailyCarbsGoal > 0 {
+			goalParts = append(goalParts, fmt.Sprintf("carbs %.0fg", profile.DailyCarbsGoal))
+		}
+		parts = append(parts, "Daily nutrition goals: "+strings.Join(goalParts, ", "))
 	}
 
 	if len(parts) == 0 {

@@ -35,7 +35,7 @@ import (
 	_ "openai/docs"
 )
 
-var APP_VERSION = "1.3.2"
+var APP_VERSION = "1.3.3"
 
 const swaggerHTML = `<!DOCTYPE html>
 <html lang="en">
@@ -431,6 +431,9 @@ func main() {
 				}
 
 				dietaryCtx := handlers.BuildDietaryContext(pool, email)
+				if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
+					dietaryCtx += memCtx
+				}
 				recipe, err := handlers.GetRecipeByPrompt(refinedPrompt, dietaryCtx)
 				isPremium := handlers.UserIsPremium(pool, email)
 				logger.Info("premium_check",
@@ -513,8 +516,13 @@ func main() {
 					recipe.ID = recipeDBID
 				}
 
+				go handlers.UpdateUserMemory(pool, email, recipe)
+
+				remainingBalance, _ := handlers.GetUserFreePromptsCount(pool, email)
 				c.JSON(http.StatusOK, gin.H{
-					"operation": opName, "data": recipe,
+					"operation":         opName,
+					"data":              recipe,
+					"remaining_balance": remainingBalance,
 				})
 			case "CONSULT":
 				if enableTavily {
@@ -532,6 +540,9 @@ func main() {
 				}
 
 				dietaryCtx := handlers.BuildDietaryContext(pool, email)
+				if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
+					dietaryCtx += memCtx
+				}
 				consult, err := handlers.Consult(refinedPrompt, dietaryCtx)
 				if err != nil {
 					logger.Error("consult_gen_error",
@@ -543,8 +554,11 @@ func main() {
 					return
 				}
 
+				remainingBalance, _ := handlers.GetUserFreePromptsCount(pool, email)
 				c.JSON(http.StatusOK, gin.H{
-					"operation": opName, "data": consult,
+					"operation":         opName,
+					"data":              consult,
+					"remaining_balance": remainingBalance,
 				})
 			case "CALORIES":
 				if enableTavily {
@@ -562,6 +576,9 @@ func main() {
 				}
 
 				dietaryCtx := handlers.BuildDietaryContext(pool, email)
+				if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
+					dietaryCtx += memCtx
+				}
 				calories, err := handlers.Calories(refinedPrompt, body.Image, dietaryCtx)
 				if err != nil {
 					logger.Error("calories_gen_error",
@@ -573,8 +590,11 @@ func main() {
 					return
 				}
 
+				remainingBalance, _ := handlers.GetUserFreePromptsCount(pool, email)
 				c.JSON(http.StatusOK, gin.H{
-					"operation": opName, "data": calories,
+					"operation":         opName,
+					"data":              calories,
+					"remaining_balance": remainingBalance,
 				})
 			case "RECIPE_PHOTO":
 
@@ -589,6 +609,9 @@ func main() {
 				}
 
 				dietaryCtx := handlers.BuildDietaryContext(pool, email)
+				if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
+					dietaryCtx += memCtx
+				}
 				recipe, err := handlers.GetRecipeFromPhoto(refinedPrompt, body.Image, dietaryCtx)
 				if err != nil {
 					logger.Error("recipe_photo_gen_error",
@@ -620,15 +643,28 @@ func main() {
 					recipe.ID = recipeDBID
 				}
 
+				go handlers.UpdateUserMemory(pool, email, recipe)
+
+				remainingBalance, _ := handlers.GetUserFreePromptsCount(pool, email)
 				c.JSON(http.StatusOK, gin.H{
-					"operation": opName, "data": recipe,
+					"operation":         opName,
+					"data":              recipe,
+					"remaining_balance": remainingBalance,
 				})
 
 			default:
 				// Если ИИ выдал что-то странное, просто консультируем
 				dietaryCtx := handlers.BuildDietaryContext(pool, email)
+				if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
+					dietaryCtx += memCtx
+				}
 				consult, _ := handlers.Consult(refinedPrompt, dietaryCtx)
-				c.JSON(http.StatusOK, gin.H{"operation": "CONSULT", "data": consult})
+				remainingBalance, _ := handlers.GetUserFreePromptsCount(pool, email)
+				c.JSON(http.StatusOK, gin.H{
+					"operation":         "CONSULT",
+					"data":              consult,
+					"remaining_balance": remainingBalance,
+				})
 			}
 
 			duration := time.Since(start).Milliseconds()
@@ -728,6 +764,9 @@ func main() {
 			}
 
 			dietaryCtx := handlers.BuildDietaryContext(pool, email)
+			if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
+				dietaryCtx += memCtx
+			}
 			mealPlan, err := handlers.GenerateMealPlan(refinedPrompt, dietaryCtx)
 			if err != nil {
 				logger.Error("meal_plan_generation_failed", "error", err, "user", email)
@@ -740,7 +779,12 @@ func main() {
 			}
 
 			logger.Info("meal_plan_generated", "user", email, "days", len(mealPlan.Days))
-			c.JSON(http.StatusOK, gin.H{"operation": "MEAL_PLAN", "data": mealPlan})
+			remainingBalance, _ := handlers.GetUserFreePromptsCount(pool, email)
+			c.JSON(http.StatusOK, gin.H{
+				"operation":         "MEAL_PLAN",
+				"data":              mealPlan,
+				"remaining_balance": remainingBalance,
+			})
 		})
 
 		protected.GET("/meal-plan", handlers.GetLatestMealPlan(pool))
@@ -787,6 +831,9 @@ func main() {
 			}
 
 			dietaryCtx := handlers.BuildDietaryContext(pool, email)
+			if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
+				dietaryCtx += memCtx
+			}
 			result, err := handlers.GetSubstitutes(body.Ingredient, body.Reason, dietaryCtx)
 			if err != nil {
 				logger.Error("substitute_failed", "error", err, "user", email)
@@ -795,7 +842,12 @@ func main() {
 			}
 
 			logger.Info("substitute_generated", "user", email, "ingredient", body.Ingredient)
-			c.JSON(http.StatusOK, gin.H{"operation": "SUBSTITUTE", "data": result})
+			remainingBalance, _ := handlers.GetUserFreePromptsCount(pool, email)
+			c.JSON(http.StatusOK, gin.H{
+				"operation":         "SUBSTITUTE",
+				"data":              result,
+				"remaining_balance": remainingBalance,
+			})
 		})
 
 		protected.POST("/what-to-cook", func(c *gin.Context) {
@@ -828,6 +880,9 @@ func main() {
 			}
 
 			dietaryCtx := handlers.BuildDietaryContext(pool, email)
+			if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
+				dietaryCtx += memCtx
+			}
 			result, err := handlers.WhatToCook(body.Ingredients, body.Preferences, dietaryCtx)
 			if err != nil {
 				logger.Error("what_to_cook_failed", "error", err, "user", email)
@@ -836,7 +891,12 @@ func main() {
 			}
 
 			logger.Info("what_to_cook_generated", "user", email, "ingredients_count", len(body.Ingredients))
-			c.JSON(http.StatusOK, gin.H{"operation": "WHAT_TO_COOK", "data": result})
+			remainingBalance, _ := handlers.GetUserFreePromptsCount(pool, email)
+			c.JSON(http.StatusOK, gin.H{
+				"operation":         "WHAT_TO_COOK",
+				"data":              result,
+				"remaining_balance": remainingBalance,
+			})
 		})
 
 		protected.POST("/nutrition-log", func(c *gin.Context) {
@@ -868,6 +928,9 @@ func main() {
 			}
 
 			dietaryCtx := handlers.BuildDietaryContext(pool, email)
+			if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
+				dietaryCtx += memCtx
+			}
 			result, err := handlers.AnalyzeNutritionLog(body.Meals, dietaryCtx)
 			if err != nil {
 				logger.Error("nutrition_log_failed", "error", err, "user", email)
@@ -881,10 +944,12 @@ func main() {
 			}
 
 			logger.Info("nutrition_log_analyzed", "user", email, "meals", len(body.Meals))
+			remainingBalance, _ := handlers.GetUserFreePromptsCount(pool, email)
 			c.JSON(http.StatusOK, gin.H{
-				"operation": "NUTRITION_LOG",
-				"data":      result,
-				"log_id":    logID,
+				"operation":         "NUTRITION_LOG",
+				"data":              result,
+				"log_id":            logID,
+				"remaining_balance": remainingBalance,
 			})
 		})
 
