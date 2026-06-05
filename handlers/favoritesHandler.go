@@ -56,8 +56,22 @@ func AddToFavorites(db *pgxpool.Pool) gin.HandlerFunc {
 			return
 		}
 
+		go func() {
+			if recipe := fetchAndBuildRecipe(db, body.RecipeID); recipe != nil {
+				UpdateUserMemory(db, email, recipe)
+			}
+		}()
+
 		c.JSON(http.StatusCreated, gin.H{"id": favID, "status": "saved"})
 	}
+}
+
+func fetchAndBuildRecipe(db *pgxpool.Pool, recipeID string) *model.Recipe {
+	recipe, err := RecipeFromDB(db, recipeID)
+	if err != nil {
+		slog.Error("fetch_recipe_for_memory_failed", "recipe_id", recipeID, "error", err)
+	}
+	return recipe
 }
 
 func GetFavorites(db *pgxpool.Pool) gin.HandlerFunc {
@@ -161,6 +175,17 @@ func RemoveFavorite(db *pgxpool.Pool) gin.HandlerFunc {
 			return
 		}
 
+		// Получаем recipe_id до удаления
+		var recipeID string
+		err = db.QueryRow(context.Background(),
+			"SELECT recipe_id::text FROM favorites WHERE id = $1 AND user_id = $2::uuid",
+			favID, userID,
+		).Scan(&recipeID)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "favorite not found"})
+			return
+		}
+
 		tag, err := db.Exec(context.Background(),
 			`DELETE FROM favorites WHERE id = $1 AND user_id = $2::uuid`,
 			favID, userID,
@@ -173,6 +198,14 @@ func RemoveFavorite(db *pgxpool.Pool) gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{"error": "favorite not found"})
 			return
 		}
+
+		// Обновляем память — пользователь убрал из избранного
+		go func() {
+			if recipe := fetchAndBuildRecipe(db, recipeID); recipe != nil {
+				recipe.Title = recipe.Title + " (user removed from favorites)"
+				UpdateUserMemory(db, email, recipe)
+			}
+		}()
 
 		c.JSON(http.StatusOK, gin.H{"status": "removed"})
 	}

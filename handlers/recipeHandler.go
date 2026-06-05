@@ -20,6 +20,26 @@ import (
 	"github.com/spf13/viper"
 )
 
+const maxHistoryMessages = 6
+
+func buildMessages(systemMsg string, history []model.Message, userMsg openai.ChatCompletionMessageParamUnion) []openai.ChatCompletionMessageParamUnion {
+	if len(history) > maxHistoryMessages {
+		history = history[len(history)-maxHistoryMessages:]
+	}
+	messages := []openai.ChatCompletionMessageParamUnion{
+		openai.SystemMessage(systemMsg),
+	}
+	for _, msg := range history {
+		if msg.Role == "user" {
+			messages = append(messages, openai.UserMessage(msg.Content))
+		} else {
+			messages = append(messages, openai.AssistantMessage(msg.Content))
+		}
+	}
+	messages = append(messages, userMsg)
+	return messages
+}
+
 func applyStyle(promptKey, style string) string {
 	basePrompt := viper.GetString("prompts." + promptKey)
 
@@ -56,7 +76,7 @@ func applyStyle(promptKey, style string) string {
 }
 
 // 🍳 GetRecipeByPrompt — основная функция, обращается к GPT и возвращает структуру рецепта.
-func GetRecipeByPrompt(prompt, dietaryContext, style string) (*model.Recipe, error) {
+func GetRecipeByPrompt(prompt, dietaryContext, style string, history []model.Message) (*model.Recipe, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -74,10 +94,7 @@ func GetRecipeByPrompt(prompt, dietaryContext, style string) (*model.Recipe, err
 
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(systemMsg),
-			openai.UserMessage(prompt),
-		},
+		Messages: buildMessages(systemMsg, history, openai.UserMessage(prompt)),
 		MaxCompletionTokens: openai.Int(2000),
 	}
 
@@ -103,7 +120,7 @@ func GetRecipeByPrompt(prompt, dietaryContext, style string) (*model.Recipe, err
 }
 
 // тип операции консультация
-func Consult(prompt, dietaryContext, style string) (*model.Consult, error) {
+func Consult(prompt, dietaryContext, style string, history []model.Message) (*model.Consult, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -121,10 +138,7 @@ func Consult(prompt, dietaryContext, style string) (*model.Consult, error) {
 
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(systemMsg),
-			openai.UserMessage(prompt),
-		},
+		Messages: buildMessages(systemMsg, history, openai.UserMessage(prompt)),
 		MaxCompletionTokens: openai.Int(2000),
 	}
 
@@ -148,7 +162,7 @@ func Consult(prompt, dietaryContext, style string) (*model.Consult, error) {
 }
 
 // рецепт с фото
-func GetRecipeFromPhoto(prompt, base64Image, dietaryContext, style string) (*model.Recipe, error) {
+func GetRecipeFromPhoto(prompt, base64Image, dietaryContext, style string, history []model.Message) (*model.Recipe, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -167,20 +181,15 @@ func GetRecipeFromPhoto(prompt, base64Image, dietaryContext, style string) (*mod
 
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
-		Messages: []openai.ChatCompletionMessageParamUnion{
-
-			openai.SystemMessage(systemMsg),
-			openai.UserMessage(
-				[]openai.ChatCompletionContentPartUnionParam{
-					openai.TextContentPart(prompt),
-					openai.ImageContentPart(
-						openai.ChatCompletionContentPartImageImageURLParam{
-							URL: imageUrl,
-						}),
-				},
-			),
-		},
-
+		Messages: buildMessages(systemMsg, history, openai.UserMessage(
+			[]openai.ChatCompletionContentPartUnionParam{
+				openai.TextContentPart(prompt),
+				openai.ImageContentPart(
+					openai.ChatCompletionContentPartImageImageURLParam{
+						URL: imageUrl,
+					}),
+			},
+		)),
 		MaxCompletionTokens: openai.Int(2000),
 	}
 
@@ -206,7 +215,7 @@ func GetRecipeFromPhoto(prompt, base64Image, dietaryContext, style string) (*mod
 }
 
 // рецепт с фото
-func Calories(prompt, base64Image, dietaryContext, style string) (*model.Calories, error) {
+func Calories(prompt, base64Image, dietaryContext, style string, history []model.Message) (*model.Calories, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -226,20 +235,15 @@ func Calories(prompt, base64Image, dietaryContext, style string) (*model.Calorie
 
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
-		Messages: []openai.ChatCompletionMessageParamUnion{
-
-			openai.SystemMessage(systemMsg),
-			openai.UserMessage(
-				[]openai.ChatCompletionContentPartUnionParam{
-					openai.TextContentPart(prompt),
-					openai.ImageContentPart(
-						openai.ChatCompletionContentPartImageImageURLParam{
-							URL: imageUrl,
-						}),
-				},
-			),
-		},
-
+		Messages: buildMessages(systemMsg, history, openai.UserMessage(
+			[]openai.ChatCompletionContentPartUnionParam{
+				openai.TextContentPart(prompt),
+				openai.ImageContentPart(
+					openai.ChatCompletionContentPartImageImageURLParam{
+						URL: imageUrl,
+					}),
+			},
+		)),
 		MaxCompletionTokens: openai.Int(2000),
 	}
 
@@ -264,7 +268,7 @@ func Calories(prompt, base64Image, dietaryContext, style string) (*model.Calorie
 	return &calorie, nil
 }
 
-// Определение AI операции. Варианты: GENERATE, CALORIES, RECIPE_PHOTO, CONSULT
+// Определение AI операции. Варианты: GENERATE, CALORIES, RECIPE_PHOTO, CONSULT, DETECTIVE
 func DetectAIOperation(prompt string, history []model.Message, hasImage bool, base64Image string) (string, string, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {

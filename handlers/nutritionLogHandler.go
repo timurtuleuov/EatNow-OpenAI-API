@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func AnalyzeNutritionLog(meals []string, dietaryContext, style string) (*model.NutritionLogResponse, error) {
+func AnalyzeNutritionLog(meals []string, dietaryContext, style string, history []model.Message) (*model.NutritionLogResponse, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -33,10 +33,7 @@ func AnalyzeNutritionLog(meals []string, dietaryContext, style string) (*model.N
 
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(systemMsg),
-			openai.UserMessage(prompt),
-		},
+		Messages: buildMessages(systemMsg, history, openai.UserMessage(prompt)),
 		MaxCompletionTokens: openai.Int(1500),
 	}
 

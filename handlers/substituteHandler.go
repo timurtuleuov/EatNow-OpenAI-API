@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func GetSubstitutes(ingredient, reason, dietaryContext, style string) (*model.SubstituteResponse, error) {
+func GetSubstitutes(ingredient, reason, dietaryContext, style string, history []model.Message) (*model.SubstituteResponse, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -35,10 +35,7 @@ func GetSubstitutes(ingredient, reason, dietaryContext, style string) (*model.Su
 
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(systemMsg),
-			openai.UserMessage(prompt),
-		},
+		Messages: buildMessages(systemMsg, history, openai.UserMessage(prompt)),
 		MaxCompletionTokens: openai.Int(1000),
 	}
 

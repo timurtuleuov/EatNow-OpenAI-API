@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
+	"log/slog"
 
 	model "openai/models"
 
@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func WhatToCook(ingredients []string, preferences, dietaryContext, style string, history []model.Message) (*model.WhatToCookResponse, error) {
+func Detective(prompt, dietaryContext, style string, history []model.Message) (*model.DetectiveResponse, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -24,12 +24,7 @@ func WhatToCook(ingredients []string, preferences, dietaryContext, style string,
 		option.WithBaseURL("https://api.deepseek.com/"),
 	)
 
-	prompt := fmt.Sprintf("Ингредиенты: %s.", strings.Join(ingredients, ", "))
-	if preferences != "" {
-		prompt += fmt.Sprintf(" Пожелания: %s.", preferences)
-	}
-
-	systemMsg := applyStyle("what_to_cook", style)
+	systemMsg := applyStyle("detect_dish", style)
 	if dietaryContext != "" {
 		systemMsg = dietaryContext + "\n\n" + systemMsg
 	}
@@ -37,23 +32,33 @@ func WhatToCook(ingredients []string, preferences, dietaryContext, style string,
 	params := openai.ChatCompletionNewParams{
 		Model: viper.GetString("deepseek.model"),
 		Messages: buildMessages(systemMsg, history, openai.UserMessage(prompt)),
-		MaxCompletionTokens: openai.Int(2000),
+		MaxCompletionTokens: openai.Int(1000),
 	}
 
 	resp, err := client.Chat.Completions.New(context.Background(), params)
 	if err != nil {
-		return nil, fmt.Errorf("OpenAI request failed: %w", err)
+		return nil, fmt.Errorf("DeepSeek request failed: %w", err)
 	}
 
 	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
-		return nil, fmt.Errorf("пустой ответ от модели")
+		return nil, fmt.Errorf("модель не сгенерировала контент (пустой ответ)")
 	}
 
 	raw := resp.Choices[0].Message.Content
 
-	var result model.WhatToCookResponse
+	var result model.DetectiveResponse
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {
-		return nil, fmt.Errorf("JSON parse error: %w\nRaw:\n%s", err, raw)
+		slog.Warn("detective_json_fallback",
+			"error", err,
+			"raw", raw,
+		)
+		result = model.DetectiveResponse{
+			Message:    raw,
+			Questions:  []string{},
+			Hypothesis: "",
+			Confidence: 0,
+			EnoughInfo: false,
+		}
 	}
 
 	return &result, nil

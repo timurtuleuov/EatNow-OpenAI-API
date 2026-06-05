@@ -15,6 +15,7 @@ pricing:
   substitute: 3
   what_to_cook: 5
   nutrition_log: 5
+  detect: 2
 
 balance:
   free_monthly: 50

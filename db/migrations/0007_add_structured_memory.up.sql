@@ -1,0 +1,1 @@
+ALTER TABLE user_memories ADD COLUMN IF NOT EXISTS structured JSONB DEFAULT '{}' NOT NULL;
