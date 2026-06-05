@@ -21,6 +21,8 @@ import (
 )
 
 func applyStyle(promptKey, style string) string {
+	basePrompt := viper.GetString("prompts." + promptKey)
+
 	if style != "" && style != "default" {
 		styleSuffix := strings.ReplaceAll(style, "-", "_")
 		styledKey := "prompts." + promptKey + "_" + styleSuffix
@@ -30,16 +32,27 @@ func applyStyle(promptKey, style string) string {
 				"style", style,
 				"resolved_key", styledKey,
 			)
-			return styledPrompt
+			basePrompt = styledPrompt
+		} else {
+			slog.Warn("style_not_found",
+				"prompt_key", promptKey,
+				"style", style,
+				"resolved_key", styledKey,
+				"fallback", "prompts."+promptKey,
+			)
 		}
-		slog.Warn("style_not_found",
-			"prompt_key", promptKey,
-			"style", style,
-			"resolved_key", styledKey,
-			"fallback", "prompts."+promptKey,
-		)
+
+		if prepend := viper.GetString("style_prepends." + styleSuffix); prepend != "" {
+			slog.Debug("style_prepend_applied",
+				"prompt_key", promptKey,
+				"style", style,
+				"prepend_key", "style_prepends."+styleSuffix,
+			)
+			basePrompt = prepend + "\n\n" + basePrompt
+		}
 	}
-	return viper.GetString("prompts." + promptKey)
+
+	return basePrompt
 }
 
 // 🍳 GetRecipeByPrompt — основная функция, обращается к GPT и возвращает структуру рецепта.
