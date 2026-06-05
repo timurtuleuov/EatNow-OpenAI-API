@@ -445,7 +445,14 @@ func main() {
 
 				if isPremium {
 
-					imagePrompt := "Сделай картинку блюда по рецепту, без надписей: " + refinedPrompt
+					imagePrompt := fmt.Sprintf(`Professional food photography of %s. 
+					Shot on Canon 5D with 100mm macro lens, f/2.8, shallow depth of field. 
+					Moody dark background with dramatic side lighting and subtle steam rising. 
+					Garnished with fresh herbs, glistening sauce, perfect golden crust. 
+					Shot from 45-degree angle, styled on rustic wooden board or slate. 
+					Bokeh background, ultra-sharp food details, rich saturated colors, 
+					restaurant-quality plating. Instagram food photography style, 
+					no text, no watermarks, photorealistic.`, refinedPrompt)
 
 					// Если включен экспериментальный режим brainrot
 					if body.IsBrainrot {
@@ -861,7 +868,7 @@ func main() {
 			var body struct {
 				Ingredients []string `json:"ingredients"`
 				Preferences string   `json:"preferences"`
-				Style      string    `json:"style"`
+				Style       string   `json:"style"`
 			}
 
 			if err := c.ShouldBindJSON(&body); err != nil {
