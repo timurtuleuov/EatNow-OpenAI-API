@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func GenerateMealPlan(prompt, dietaryContext string) (*model.MealPlan, error) {
+func GenerateMealPlan(prompt, dietaryContext, style string) (*model.MealPlan, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -23,7 +23,7 @@ func GenerateMealPlan(prompt, dietaryContext string) (*model.MealPlan, error) {
 		option.WithBaseURL("https://api.deepseek.com/"),
 	)
 
-	systemMsg := viper.GetString("prompts.meal_plan")
+	systemMsg := applyStyle("meal_plan", style)
 	if dietaryContext != "" {
 		systemMsg = dietaryContext + "\n\n" + systemMsg
 	}

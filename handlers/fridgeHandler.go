@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func WhatToCook(ingredients []string, preferences, dietaryContext string) (*model.WhatToCookResponse, error) {
+func WhatToCook(ingredients []string, preferences, dietaryContext, style string) (*model.WhatToCookResponse, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -29,7 +29,7 @@ func WhatToCook(ingredients []string, preferences, dietaryContext string) (*mode
 		prompt += fmt.Sprintf(" Пожелания: %s.", preferences)
 	}
 
-	systemMsg := viper.GetString("prompts.what_to_cook")
+	systemMsg := applyStyle("what_to_cook", style)
 	if dietaryContext != "" {
 		systemMsg = dietaryContext + "\n\n" + systemMsg
 	}

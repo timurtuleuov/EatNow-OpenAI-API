@@ -362,6 +362,7 @@ func main() {
 				History    []model.Message `json:"history"`
 				Image      string          `json:"image"`
 				IsBrainrot bool            `json:"is_brainrot"`
+				Style      string          `json:"style"`
 			}
 
 			logger.Info("new_recipe_request",
@@ -411,6 +412,7 @@ func main() {
 			logger.Info("ai_operation_detected",
 				"op", opName,
 				"user", email,
+				"style", body.Style,
 			)
 
 			switch opName {
@@ -434,7 +436,7 @@ func main() {
 				if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
 					dietaryCtx += memCtx
 				}
-				recipe, err := handlers.GetRecipeByPrompt(refinedPrompt, dietaryCtx)
+				recipe, err := handlers.GetRecipeByPrompt(refinedPrompt, dietaryCtx, body.Style)
 				isPremium := handlers.UserIsPremium(pool, email)
 				logger.Info("premium_check",
 					"user", email,
@@ -543,7 +545,7 @@ func main() {
 				if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
 					dietaryCtx += memCtx
 				}
-				consult, err := handlers.Consult(refinedPrompt, dietaryCtx)
+				consult, err := handlers.Consult(refinedPrompt, dietaryCtx, body.Style)
 				if err != nil {
 					logger.Error("consult_gen_error",
 						logpkg.KeyError, err,
@@ -579,7 +581,7 @@ func main() {
 				if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
 					dietaryCtx += memCtx
 				}
-				calories, err := handlers.Calories(refinedPrompt, body.Image, dietaryCtx)
+				calories, err := handlers.Calories(refinedPrompt, body.Image, dietaryCtx, body.Style)
 				if err != nil {
 					logger.Error("calories_gen_error",
 						logpkg.KeyError, err,
@@ -612,7 +614,7 @@ func main() {
 				if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
 					dietaryCtx += memCtx
 				}
-				recipe, err := handlers.GetRecipeFromPhoto(refinedPrompt, body.Image, dietaryCtx)
+				recipe, err := handlers.GetRecipeFromPhoto(refinedPrompt, body.Image, dietaryCtx, body.Style)
 				if err != nil {
 					logger.Error("recipe_photo_gen_error",
 						logpkg.KeyError, err,
@@ -658,7 +660,7 @@ func main() {
 				if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
 					dietaryCtx += memCtx
 				}
-				consult, _ := handlers.Consult(refinedPrompt, dietaryCtx)
+				consult, _ := handlers.Consult(refinedPrompt, dietaryCtx, body.Style)
 				remainingBalance, _ := handlers.GetUserFreePromptsCount(pool, email)
 				c.JSON(http.StatusOK, gin.H{
 					"operation":         "CONSULT",
@@ -737,6 +739,7 @@ func main() {
 				Prompt     string          `json:"prompt"`
 				History    []model.Message `json:"history"`
 				IsBrainrot bool            `json:"is_brainrot"`
+				Style      string          `json:"style"`
 			}
 
 			if err := c.ShouldBindJSON(&body); err != nil {
@@ -767,7 +770,7 @@ func main() {
 			if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
 				dietaryCtx += memCtx
 			}
-			mealPlan, err := handlers.GenerateMealPlan(refinedPrompt, dietaryCtx)
+			mealPlan, err := handlers.GenerateMealPlan(refinedPrompt, dietaryCtx, body.Style)
 			if err != nil {
 				logger.Error("meal_plan_generation_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -808,6 +811,7 @@ func main() {
 			var body struct {
 				Ingredient string `json:"ingredient"`
 				Reason     string `json:"reason"`
+				Style      string `json:"style"`
 			}
 
 			if err := c.ShouldBindJSON(&body); err != nil {
@@ -834,7 +838,7 @@ func main() {
 			if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
 				dietaryCtx += memCtx
 			}
-			result, err := handlers.GetSubstitutes(body.Ingredient, body.Reason, dietaryCtx)
+			result, err := handlers.GetSubstitutes(body.Ingredient, body.Reason, dietaryCtx, body.Style)
 			if err != nil {
 				logger.Error("substitute_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -857,6 +861,7 @@ func main() {
 			var body struct {
 				Ingredients []string `json:"ingredients"`
 				Preferences string   `json:"preferences"`
+				Style      string    `json:"style"`
 			}
 
 			if err := c.ShouldBindJSON(&body); err != nil {
@@ -883,7 +888,7 @@ func main() {
 			if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
 				dietaryCtx += memCtx
 			}
-			result, err := handlers.WhatToCook(body.Ingredients, body.Preferences, dietaryCtx)
+			result, err := handlers.WhatToCook(body.Ingredients, body.Preferences, dietaryCtx, body.Style)
 			if err != nil {
 				logger.Error("what_to_cook_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -905,6 +910,7 @@ func main() {
 
 			var body struct {
 				Meals []string `json:"meals"`
+				Style string   `json:"style"`
 			}
 
 			if err := c.ShouldBindJSON(&body); err != nil {
@@ -931,7 +937,7 @@ func main() {
 			if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
 				dietaryCtx += memCtx
 			}
-			result, err := handlers.AnalyzeNutritionLog(body.Meals, dietaryCtx)
+			result, err := handlers.AnalyzeNutritionLog(body.Meals, dietaryCtx, body.Style)
 			if err != nil {
 				logger.Error("nutrition_log_failed", "error", err, "user", email)
 				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

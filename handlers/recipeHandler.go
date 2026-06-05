@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,8 +20,30 @@ import (
 	"github.com/spf13/viper"
 )
 
+func applyStyle(promptKey, style string) string {
+	if style != "" && style != "default" {
+		styleSuffix := strings.ReplaceAll(style, "-", "_")
+		styledKey := "prompts." + promptKey + "_" + styleSuffix
+		if styledPrompt := viper.GetString(styledKey); styledPrompt != "" {
+			slog.Debug("style_applied",
+				"prompt_key", promptKey,
+				"style", style,
+				"resolved_key", styledKey,
+			)
+			return styledPrompt
+		}
+		slog.Warn("style_not_found",
+			"prompt_key", promptKey,
+			"style", style,
+			"resolved_key", styledKey,
+			"fallback", "prompts."+promptKey,
+		)
+	}
+	return viper.GetString("prompts." + promptKey)
+}
+
 // 🍳 GetRecipeByPrompt — основная функция, обращается к GPT и возвращает структуру рецепта.
-func GetRecipeByPrompt(prompt, dietaryContext string) (*model.Recipe, error) {
+func GetRecipeByPrompt(prompt, dietaryContext, style string) (*model.Recipe, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -31,7 +54,7 @@ func GetRecipeByPrompt(prompt, dietaryContext string) (*model.Recipe, error) {
 		option.WithBaseURL("https://api.deepseek.com/"),
 	)
 
-	systemMsg := viper.GetString("prompts.generate_recipe")
+	systemMsg := applyStyle("generate_recipe", style)
 	if dietaryContext != "" {
 		systemMsg = dietaryContext + "\n\n" + systemMsg
 	}
@@ -49,7 +72,6 @@ func GetRecipeByPrompt(prompt, dietaryContext string) (*model.Recipe, error) {
 	if err != nil {
 		return nil, fmt.Errorf("DeepSeek request failed: %w", err)
 	}
-	// fmt.Println("🧾 RAW RESPONSE:", resp)
 
 	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
 		return nil, fmt.Errorf("модель не сгенерировала контент (пустой ответ)")
@@ -68,7 +90,7 @@ func GetRecipeByPrompt(prompt, dietaryContext string) (*model.Recipe, error) {
 }
 
 // тип операции консультация
-func Consult(prompt, dietaryContext string) (*model.Consult, error) {
+func Consult(prompt, dietaryContext, style string) (*model.Consult, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -79,7 +101,7 @@ func Consult(prompt, dietaryContext string) (*model.Consult, error) {
 		option.WithBaseURL("https://api.deepseek.com/"),
 	)
 
-	systemMsg := viper.GetString("prompts.consult")
+	systemMsg := applyStyle("consult", style)
 	if dietaryContext != "" {
 		systemMsg = dietaryContext + "\n\n" + systemMsg
 	}
@@ -113,7 +135,7 @@ func Consult(prompt, dietaryContext string) (*model.Consult, error) {
 }
 
 // рецепт с фото
-func GetRecipeFromPhoto(prompt, base64Image, dietaryContext string) (*model.Recipe, error) {
+func GetRecipeFromPhoto(prompt, base64Image, dietaryContext, style string) (*model.Recipe, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -125,7 +147,7 @@ func GetRecipeFromPhoto(prompt, base64Image, dietaryContext string) (*model.Reci
 	)
 	imageUrl := fmt.Sprintf("data:image/jpeg;base64,%s", base64Image)
 
-	systemMsg := viper.GetString("prompts.recipe_from_photo")
+	systemMsg := applyStyle("recipe_from_photo", style)
 	if dietaryContext != "" {
 		systemMsg = dietaryContext + "\n\n" + systemMsg
 	}
@@ -171,7 +193,7 @@ func GetRecipeFromPhoto(prompt, base64Image, dietaryContext string) (*model.Reci
 }
 
 // рецепт с фото
-func Calories(prompt, base64Image, dietaryContext string) (*model.Calories, error) {
+func Calories(prompt, base64Image, dietaryContext, style string) (*model.Calories, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -184,7 +206,7 @@ func Calories(prompt, base64Image, dietaryContext string) (*model.Calories, erro
 
 	imageUrl := fmt.Sprintf("data:image/jpeg;base64,%s", base64Image)
 
-	systemMsg := viper.GetString("prompts.calories_estimation")
+	systemMsg := applyStyle("calories_estimation", style)
 	if dietaryContext != "" {
 		systemMsg = dietaryContext + "\n\n" + systemMsg
 	}

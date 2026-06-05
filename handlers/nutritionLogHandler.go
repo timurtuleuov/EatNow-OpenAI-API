@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-func AnalyzeNutritionLog(meals []string, dietaryContext string) (*model.NutritionLogResponse, error) {
+func AnalyzeNutritionLog(meals []string, dietaryContext, style string) (*model.NutritionLogResponse, error) {
 	var apiKey = viper.GetString("deepseek.api_key")
 	if apiKey == "" {
 		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
@@ -26,7 +26,7 @@ func AnalyzeNutritionLog(meals []string, dietaryContext string) (*model.Nutritio
 
 	prompt := "Вот что я съел за день:\n" + strings.Join(meals, "\n")
 
-	systemMsg := viper.GetString("prompts.nutrition_log")
+	systemMsg := applyStyle("nutrition_log", style)
 	if dietaryContext != "" {
 		systemMsg = dietaryContext + "\n\n" + systemMsg
 	}
