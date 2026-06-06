@@ -19,7 +19,7 @@ jobs:
         uses: super-linter/super-linter@v5
         env:
           VALIDATE_ALL_CODEBASE: false # Проверять только измененные файлы (так быстрее)
-          DEFAULT_BRANCH: main
+          DEFAULT_BRANCH: master
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Создается GitHub автоматически
 
       # 2. Линтинг Dockerfile (оставляем для надежности)
