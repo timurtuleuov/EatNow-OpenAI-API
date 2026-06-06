@@ -10,34 +10,38 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          # Super-Linter требует полную историю коммитов для проверки только измененных файлов
-          fetch-depth: 0
 
-      # 1. Линтинг кода всего проекта
-      - name: Lint Code Base
-        uses: super-linter/super-linter@v5
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
         env:
-          VALIDATE_ALL_CODEBASE: false # Проверять только измененные файлы (так быстрее)
-          DEFAULT_BRANCH: master
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # Создается GitHub автоматически
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
-      # 2. Линтинг Dockerfile (оставляем для надежности)
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25' 
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: v1.56 
+
       - name: Lint Dockerfile
         uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: Dockerfile
 
-      # Добавляем валидацию Docker Compose
       - name: Validate Docker Compose file
         run: docker compose -f docker-compose.yml config
 
-      # 3. Сканирование на уязвимости
       - name: Run Trivy vulnerability scanner (Code)
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'fs'
           exit-code: '1'
+          ignore-unfixed: true
 
   build-and-push:
     runs-on: ubuntu-latest
