@@ -86,8 +86,8 @@ jobs:
 
   notify:
     runs-on: ubuntu-latest
-    needs: [validate,  build-and-push, deploy]
-    if: always() # Запускать всегда, даже если предыдущие шаги упали
+    needs: [validate, build-and-push, deploy]
+    if: always() 
     steps:
       - name: Send Telegram Notification
         uses: appleboy/telegram-action@master
@@ -96,7 +96,8 @@ jobs:
           token: ${{ secrets.TELEGRAM_TOKEN }}
           message: |
             Репозиторий: ${{ github.repository }}
-            Статус деплоя: ${{ needs.build-and-deploy.result }}
             Статус проверок: ${{ needs.validate.result }}
+            Статус сборки: ${{ needs.build-and-push.result }}
+            Статус деплоя: ${{ needs.deploy.result }}
             Автор: ${{ github.actor }}
             Коммит: ${{ github.event.head_commit.message }}
