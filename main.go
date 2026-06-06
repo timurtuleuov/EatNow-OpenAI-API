@@ -618,6 +618,40 @@ func main() {
 					"data":              result,
 					"remaining_balance": remainingBalance,
 				})
+			case "RATE":
+
+				if err := handlers.CheckBalance(pool, email, viper.GetInt("pricing.rate")); err != nil {
+					logger.Warn("insufficient_balance",
+						"user", email,
+						"op", "RATE",
+						"error", err,
+					)
+					c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+					return
+				}
+
+				dietaryCtx := handlers.BuildDietaryContext(pool, email)
+				if memCtx := handlers.BuildUserMemory(pool, email); memCtx != "" {
+					dietaryCtx += memCtx
+				}
+
+				result, err := handlers.Rate(refinedPrompt, dietaryCtx, body.Style, body.History)
+				if err != nil {
+					logger.Error("rate_failed",
+						logpkg.KeyError, err,
+						logpkg.KeyOp, "RATE",
+						logpkg.KeyUser, email,
+					)
+					c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+					return
+				}
+
+				remainingBalance, _ := handlers.GetUserFreePromptsCount(pool, email)
+				c.JSON(http.StatusOK, gin.H{
+					"operation":         opName,
+					"data":              result,
+					"remaining_balance": remainingBalance,
+				})
 			case "CALORIES":
 				if enableTavily {
 					refinedPrompt = enrichWithTavily(tavilyKey, body.Prompt, body.IsBrainrot)

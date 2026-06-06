@@ -1,0 +1,64 @@
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+
+	model "openai/models"
+
+	openai "github.com/openai/openai-go"
+	"github.com/openai/openai-go/option"
+	"github.com/spf13/viper"
+)
+
+func Rate(prompt, dietaryContext, style string, history []model.Message) (*model.RateResponse, error) {
+	var apiKey = viper.GetString("deepseek.api_key")
+	if apiKey == "" {
+		return nil, fmt.Errorf("environment variable DEEPSEEK_API_KEY not set")
+	}
+
+	client := openai.NewClient(
+		option.WithAPIKey(apiKey),
+		option.WithBaseURL("https://api.deepseek.com/"),
+	)
+
+	systemMsg := applyStyle("rate", style)
+	if dietaryContext != "" {
+		systemMsg = dietaryContext + "\n\n" + systemMsg
+	}
+
+	params := openai.ChatCompletionNewParams{
+		Model: viper.GetString("deepseek.model"),
+		Messages: buildMessages(systemMsg, history, openai.UserMessage(prompt)),
+		MaxCompletionTokens: openai.Int(1000),
+	}
+
+	resp, err := client.Chat.Completions.New(context.Background(), params)
+	if err != nil {
+		return nil, fmt.Errorf("DeepSeek request failed: %w", err)
+	}
+
+	if len(resp.Choices) == 0 || resp.Choices[0].Message.Content == "" {
+		return nil, fmt.Errorf("модель не сгенерировала контент (пустой ответ)")
+	}
+
+	raw := resp.Choices[0].Message.Content
+
+	var result model.RateResponse
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		slog.Warn("rate_json_fallback",
+			"error", err,
+			"raw", raw,
+		)
+		result = model.RateResponse{
+			Rating:   0,
+			Review:   raw,
+			Rational: "",
+			MemeTags: []string{},
+		}
+	}
+
+	return &result, nil
+}
