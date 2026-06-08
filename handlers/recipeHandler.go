@@ -22,6 +22,17 @@ import (
 
 const maxHistoryMessages = 6
 
+func cleanJSON(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if strings.HasPrefix(raw, "```") {
+		raw = strings.TrimPrefix(raw, "```json")
+		raw = strings.TrimPrefix(raw, "```")
+		raw = strings.TrimSuffix(raw, "```")
+		raw = strings.TrimSpace(raw)
+	}
+	return raw
+}
+
 func buildMessages(systemMsg string, history []model.Message, userMsg openai.ChatCompletionMessageParamUnion) []openai.ChatCompletionMessageParamUnion {
 	if len(history) > maxHistoryMessages {
 		history = history[len(history)-maxHistoryMessages:]

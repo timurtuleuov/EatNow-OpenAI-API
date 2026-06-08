@@ -44,7 +44,7 @@ func Rate(prompt, dietaryContext, style string, history []model.Message) (*model
 		return nil, fmt.Errorf("модель не сгенерировала контент (пустой ответ)")
 	}
 
-	raw := resp.Choices[0].Message.Content
+	raw := cleanJSON(resp.Choices[0].Message.Content)
 
 	var result model.RateResponse
 	if err := json.Unmarshal([]byte(raw), &result); err != nil {
